@@ -1,0 +1,16 @@
+{
+  "appid": "touristappid",
+  "projectname": "ride-event-mini-program",
+  "description": "公路骑行活动、报名与路书 MVP",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "setting": {
+    "es6": true,
+    "minified": true,
+    "postcss": true,
+    "enhance": true,
+    "compileWorklet": false,
+    "useCompilerPlugins": ["typescript"]
+  },
+  "condition": {}
+}

@@ -1,0 +1,15 @@
+.map-wrap { position: relative; height: 580rpx; background: #dfe6e2; }
+.route-map { width: 100%; height: 100%; }
+.map-note { position: absolute; top: 20rpx; right: 20rpx; padding: 10rpx 15rpx; border-radius: 8rpx; background: rgba(255,255,255,.94); color: var(--muted); font-size: 21rpx; }
+.route-summary { position: relative; z-index: 2; margin-top: -34rpx; padding: 32rpx 28rpx 28rpx; border-radius: 16rpx 16rpx 0 0; background: #fff; }
+.route-title { margin: 16rpx 0 4rpx; font-size: 42rpx; font-weight: 800; }
+.detail-block { margin-top: 14rpx; padding: 30rpx 28rpx; background: #fff; }
+.profile-estimated { margin-left: 8rpx; padding: 4rpx 9rpx; border-radius: 6rpx; background: #eef0f1; color: var(--muted); font-size: 20rpx; font-weight: 500; }
+.elevation { display: flex; align-items: flex-end; gap: 5rpx; height: 190rpx; padding: 18rpx 8rpx 0; border-bottom: 2rpx solid #b9c0c3; background: linear-gradient(#f4f8f6 1rpx, transparent 1rpx); background-size: 100% 48rpx; }
+.elevation-bar { flex: 1; min-height: 12rpx; border-radius: 4rpx 4rpx 0 0; background: var(--green); opacity: .86; }
+.elevation-caption { margin-top: 10rpx; color: var(--muted); font-size: 21rpx; }
+.poi { display: grid; grid-template-columns: 52rpx 1fr auto; gap: 16rpx; align-items: start; padding: 22rpx 0; border-bottom: 1rpx solid var(--line); }
+.poi:last-child { border-bottom: 0; }
+.poi-index { display: flex; align-items: center; justify-content: center; width: 46rpx; height: 46rpx; border-radius: 50%; background: var(--green); color: #fff; font-size: 22rpx; font-weight: 700; }
+.poi-name { margin-bottom: 7rpx; font-weight: 700; }
+.route-notice { margin: 16rpx 28rpx 24rpx; }

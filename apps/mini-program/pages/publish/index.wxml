@@ -1,0 +1,28 @@
+<view class="page publish-page">
+  <view class="publish-head"><view class="head-kicker">活动信息</view><view class="head-title">创建一场骑行</view><view class="head-copy">清晰说明路线、能力和纪律，让骑友在报名前做出可靠判断。</view><view class="steps"><view class="step step-on"></view><view class="step step-on"></view><view class="step step-on"></view><view class="step step-on"></view></view></view>
+  <view class="form-section">
+    <view class="form-title">01 · 路书与基础信息</view>
+    <view class="field"><label class="label required">活动路书</label><picker range="{{routes}}" range-key="name" value="{{routeIndex}}" bindchange="onRoute"><view class="route-picker"><image wx:if="{{selectedRoute}}" src="{{selectedRoute.cover}}" mode="aspectFill" /><view class="route-picker-copy"><view>{{selectedRoute ? selectedRoute.name : '正在加载路书'}}</view><view wx:if="{{selectedRoute}}" class="small">{{selectedRoute.distanceKm}} km · 爬升 {{selectedRoute.elevationGainM}} m</view></view><text>›</text></view></picker></view>
+    <view class="field"><label class="label required">活动名称</label><input class="input" maxlength="30" value="{{form.title}}" data-field="title" bindinput="onField" /></view>
+    <view class="field-row"><view class="field"><label class="label required">出发日期</label><picker mode="date" value="{{form.date}}" start="2026-08-06" bindchange="onDate"><view class="picker">{{form.date}}</view></picker></view><view class="field"><label class="label required">集合时间</label><picker mode="time" value="{{form.time}}" bindchange="onTime"><view class="picker">{{form.time}}</view></picker></view></view>
+    <view class="field"><label class="label required">集合地点</label><input class="input" maxlength="50" value="{{form.meetingPoint}}" data-field="meetingPoint" bindinput="onField" /></view>
+  </view>
+  <view class="form-section">
+    <view class="form-title">02 · 队伍设置</view>
+    <view class="field-row"><view class="field"><label class="label required">人数上限</label><input class="input" type="number" value="{{form.capacity}}" data-field="capacity" bindinput="onNumber" /></view><view class="field"><label class="label required">巡航速度</label><input class="input" value="{{form.speedRange}}" data-field="speedRange" bindinput="onField" /></view></view>
+    <view class="field"><label class="label">活动说明</label><textarea class="textarea" maxlength="300" value="{{form.description}}" data-field="description" bindinput="onField" /></view>
+  </view>
+  <view class="form-section">
+    <view class="form-title">03 · 装备与能力要求</view>
+    <view class="field"><label class="label required">必备装备</label><view class="option-grid"><view wx:for="{{equipmentOptions}}" wx:key="label" class="option {{item.selected ? 'option-selected' : ''}}" data-group="equipmentOptions" data-index="{{index}}" bindtap="toggleOption"><view class="check-box">{{item.selected ? '✓' : ''}}</view>{{item.label}}</view></view></view>
+    <view class="field-row"><view class="field"><label class="label">近 30 天单次距离</label><view class="unit-input"><input type="number" value="{{form.requirements.recentDistanceKm}}" data-field="requirements.recentDistanceKm" bindinput="onNumber" /><text>km</text></view></view><view class="field"><label class="label">近 30 天累计爬升</label><view class="unit-input"><input type="number" value="{{form.requirements.recentElevationM}}" data-field="requirements.recentElevationM" bindinput="onNumber" /><text>m</text></view></view></view>
+    <view class="field"><label class="label required">允许车型</label><view class="option-grid"><view wx:for="{{bikeOptions}}" wx:key="label" class="option {{item.selected ? 'option-selected' : ''}}" data-group="bikeOptions" data-index="{{index}}" bindtap="toggleOption"><view class="check-box">{{item.selected ? '✓' : ''}}</view>{{item.label}}</view></view></view>
+  </view>
+  <view class="form-section">
+    <view class="form-title">04 · 骑行纪律与风险</view>
+    <view class="field"><label class="label required">报名时必须确认</label><view class="option-grid"><view wx:for="{{disciplineOptions}}" wx:key="label" class="option discipline {{item.selected ? 'option-selected' : ''}}" data-group="disciplineOptions" data-index="{{index}}" bindtap="toggleOption"><view class="check-box">{{item.selected ? '✓' : ''}}</view>{{item.label}}</view></view></view>
+    <view class="field"><label class="label">补充说明</label><textarea class="textarea" maxlength="200" placeholder="例如：连续爬坡长度、下坡风险、掉队安排" value="{{form.requirements.customNote}}" data-field="requirements.customNote" bindinput="onField" /></view>
+    <view class="notice">已选择 {{form.requirements.equipment.length}} 项装备、{{form.requirements.bikeTypes.length}} 种车型和 {{form.requirements.disciplines.length}} 条纪律。发布后这些内容会在详情和报名确认页展示。</view>
+  </view>
+  <view class="sticky-actions"><button class="button button-primary" loading="{{submitting}}" disabled="{{submitting || !routes.length}}" bindtap="submit">确认发布</button></view>
+</view>

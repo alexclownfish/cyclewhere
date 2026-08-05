@@ -1,0 +1,16 @@
+<view class="page mine-page">
+  <view class="profile"><view class="avatar">林</view><view><view class="profile-name">林峥</view><view class="profile-note">北京 · 公路骑行 3 年</view></view></view>
+  <view class="segment-wrap"><view class="segment"><button class="segment-button {{active === 'registered' ? 'segment-on' : ''}}" data-value="registered" bindtap="switchSegment">我报名的 · {{registered.length}}</button><button class="segment-button {{active === 'published' ? 'segment-on' : ''}}" data-value="published" bindtap="switchSegment">我发布的 · {{published.length}}</button></view></view>
+  <view wx:if="{{loading}}" class="loading"><text class="loading-dot"></text>正在同步活动状态</view>
+  <view wx:elif="{{error}}" class="empty-state"><text class="empty-icon">!</text><view class="empty-title">同步失败</view><view class="empty-copy">{{error}}</view><button class="button button-plain" bindtap="loadMine">重试</button></view>
+  <block wx:else>
+    <view wx:if="{{active === 'registered' && !registered.length}}" class="empty-state"><text class="empty-icon">○</text><view class="empty-title">还没有报名活动</view><view class="empty-copy">挑一条合适的路线，认识一群同频的骑友。</view><button class="button button-dark" bindtap="goExplore">去发现活动</button></view>
+    <view wx:if="{{active === 'published' && !published.length}}" class="empty-state"><text class="empty-icon">＋</text><view class="empty-title">还没有发布活动</view><view class="empty-copy">从已有路书开始，几分钟内创建一场骑行。</view><button class="button button-dark" bindtap="goPublish">创建活动</button></view>
+    <view wx:if="{{active === 'registered' && registered.length}}" class="content">
+      <view wx:for="{{registered}}" wx:key="id" class="card mine-card" data-id="{{item.id}}" bindtap="openEvent"><view class="row-between"><text class="badge {{item.statusTone}}">{{item.statusText}}</text><text class="small">{{item.dateText}}</text></view><view class="title mine-title">{{item.title}}</view><view class="meta">{{item.meetingPoint}}</view><view class="meta">{{item.route.distanceKm}} km · 爬升 {{item.route.elevationGainM}} m · {{item.speedRange}}</view></view>
+    </view>
+    <view wx:if="{{active === 'published' && published.length}}" class="content">
+      <view wx:for="{{published}}" wx:key="id" class="card mine-card" data-id="{{item.id}}" bindtap="openEvent"><view class="row-between"><text class="badge {{item.statusTone}}">{{item.statusText}}</text><text class="small">{{item.registeredCount}} / {{item.capacity}} 人</text></view><view class="title mine-title">{{item.title}}</view><view class="meta">{{item.dateText}}</view><view class="meta">{{item.meetingPoint}}</view></view>
+    </view>
+  </block>
+</view>

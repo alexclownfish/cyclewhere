@@ -1,0 +1,15 @@
+<view class="page">
+  <view class="route-head"><view class="head-kicker">路线参考 / 轨迹跟随</view><view class="head-title">去更远的地方</view><view class="head-copy">查看距离、爬升、坡度和风险点，选择适合自己能力的路线。</view></view>
+  <view wx:if="{{loading}}" class="loading"><text class="loading-dot"></text>正在加载路书</view>
+  <view wx:elif="{{error}}" class="empty-state"><text class="empty-icon">!</text><view class="empty-title">路书加载失败</view><view class="empty-copy">{{error}}</view><button class="button button-plain" bindtap="loadRoutes">重试</button></view>
+  <view wx:elif="{{!routes.length}}" class="empty-state"><text class="empty-icon">⌁</text><view class="empty-title">暂无公开路书</view></view>
+  <view wx:else class="content">
+    <view wx:for="{{routes}}" wx:key="id" class="card route-card" data-id="{{item.id}}" bindtap="openRoute">
+      <image class="route-cover" src="{{item.cover}}" mode="aspectFill" lazy-load /><view class="card-body">
+        <view class="row-between"><text class="badge badge-green">{{item.difficulty}}</text><text class="small">{{item.city}}</text></view>
+        <view class="title route-title">{{item.name}}</view>
+        <view class="route-stats"><text>{{item.distanceKm}} km</text><text>爬升 {{item.elevationGainM}} m</text><text>{{item.durationText}}</text><text>最大坡度 {{item.maxGradientText}}</text></view>
+      </view>
+    </view>
+  </view>
+</view>

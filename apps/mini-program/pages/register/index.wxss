@@ -1,0 +1,12 @@
+.event-brief { padding: 34rpx 28rpx 28rpx; background: #17191b; color: #fff; }
+.brief-title { margin: 16rpx 0 8rpx; font-size: 40rpx; line-height: 1.35; font-weight: 800; }
+.event-brief .meta { color: #c8cdcf; }
+.confirm { display: flex; gap: 18rpx; margin-bottom: 20rpx; padding: 22rpx; border: 1rpx solid var(--line); border-radius: 10rpx; color: #51575b; font-size: 25rpx; line-height: 1.6; }
+.confirm-on { border-color: #e2a09c; background: var(--red-soft); color: #812b27; }
+.confirm-box { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; margin-top: 2rpx; border: 2rpx solid #aeb4b7; border-radius: 6rpx; }
+.confirm-on .confirm-box { border-color: var(--red); background: var(--red); color: #fff; }
+.privacy { color: var(--muted); font-size: 22rpx; line-height: 1.6; }
+.success-state { padding: 160rpx 52rpx 60rpx; text-align: center; }
+.success-mark { display: flex; align-items: center; justify-content: center; width: 110rpx; height: 110rpx; margin: 0 auto 32rpx; border-radius: 50%; background: var(--green); color: #fff; font-size: 62rpx; font-weight: 800; }
+.success-title { font-size: 42rpx; font-weight: 800; }
+.success-copy { margin: 20rpx auto 44rpx; color: var(--muted); line-height: 1.7; }

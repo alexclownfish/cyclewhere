@@ -1,0 +1,9 @@
+.profile { display: flex; align-items: center; gap: 22rpx; padding: 38rpx 30rpx 44rpx; background: #17191b; color: #fff; }
+.avatar { display: flex; align-items: center; justify-content: center; width: 104rpx; height: 104rpx; border-radius: 50%; background: var(--red); font-size: 38rpx; font-weight: 800; }
+.profile-name { font-size: 38rpx; font-weight: 800; }.profile-note { margin-top: 7rpx; color: #bcc2c5; font-size: 24rpx; }
+.segment-wrap { padding: 22rpx 28rpx 2rpx; background: #fff; }
+.segment { display: grid; grid-template-columns: 1fr 1fr; padding: 6rpx; border-radius: 10rpx; background: #eceeef; }
+.segment-button { min-height: 76rpx; border-radius: 8rpx; background: transparent; color: var(--muted); font-size: 25rpx; line-height: 76rpx; }
+.segment-on { background: #fff; color: var(--ink); font-weight: 700; box-shadow: 0 2rpx 8rpx rgba(0,0,0,.08); }
+.mine-card { padding: 24rpx; }
+.mine-title { margin-top: 18rpx; }

@@ -1,0 +1,40 @@
+{
+  "name": "@fengji/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "migrate": "tsx src/migrate.ts",
+    "token:demo": "tsx src/create-demo-token.ts",
+    "start": "node dist/src/server.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test --test-reporter=spec test/**/*.test.ts",
+    "test:postgres": "tsx src/migrate.ts && node --import tsx --test --test-reporter=spec test/postgres.integration.test.ts",
+    "test:coverage": "node --import tsx --test --experimental-test-coverage test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-fastify": "^11.1.6",
+    "fastify": "^5.6.0",
+    "jose": "^6.1.0",
+    "pg": "^8.22.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/pg": "^8.20.4",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "find-my-way": "9.7.0"
+  }
+}

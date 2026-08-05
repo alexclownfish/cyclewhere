@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>风迹 · 公路骑行活动小程序原型</title>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17191b;
+      --muted: #697078;
+      --line: #e3e6e8;
+      --paper: #ffffff;
+      --canvas: #eef1f2;
+      --red: #d9433b;
+      --red-soft: #faecea;
+      --green: #147a55;
+      --green-soft: #e8f4ee;
+      --amber: #a86400;
+      --amber-soft: #fff4db;
+      --blue: #2867a7;
+      --dark: #151719;
+      --shadow: 0 20px 60px rgba(16, 24, 28, 0.14);
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { background: var(--canvas); }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    .workspace {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(250px, 330px) minmax(360px, 430px);
+      justify-content: center;
+      align-items: start;
+      gap: 52px;
+      padding: 48px 28px;
+    }
+    .review-panel { position: sticky; top: 48px; padding-top: 24px; }
+    .brand-lockup { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
+    .brand-mark {
+      width: 44px; height: 44px; border-radius: 8px; display: grid; place-items: center;
+      color: #fff; background: var(--dark);
+    }
+    .brand-name { font-size: 22px; font-weight: 700; }
+    .brand-en { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .review-panel h1 { margin: 0 0 12px; font-size: 30px; line-height: 1.25; }
+    .review-panel > p { margin: 0 0 24px; color: var(--muted); line-height: 1.75; }
+    .prototype-nav { display: grid; gap: 8px; }
+    .prototype-nav button {
+      min-height: 48px; border: 1px solid transparent; border-radius: 8px; background: transparent;
+      color: var(--ink); display: flex; align-items: center; gap: 12px; padding: 0 14px; text-align: left;
+    }
+    .prototype-nav button:hover { background: rgba(255,255,255,.7); }
+    .prototype-nav button.active { background: var(--paper); border-color: var(--line); box-shadow: 0 8px 24px rgba(16,24,28,.07); }
+    .review-note { margin-top: 28px; padding-top: 18px; border-top: 1px solid #d8dcde; color: var(--muted); font-size: 13px; line-height: 1.65; }
+
+    .phone {
+      width: min(100%, 430px); height: 884px; border: 8px solid #101214; border-radius: 32px;
+      overflow: hidden; background: var(--paper); box-shadow: var(--shadow); position: relative;
+    }
+    .app { height: 100%; display: flex; flex-direction: column; background: #f6f7f8; }
+    .statusbar {
+      height: 30px; flex: 0 0 30px; padding: 8px 18px 0; display: flex; justify-content: space-between;
+      align-items: flex-start; background: var(--paper); font-size: 11px; font-weight: 700;
+    }
+    .status-icons { display: flex; gap: 5px; align-items: center; }
+    .main { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+    .main::-webkit-scrollbar { display: none; }
+    .screen { display: none; min-height: 100%; padding-bottom: 28px; }
+    .screen.active { display: block; }
+    .topbar {
+      min-height: 54px; padding: 7px 16px 10px; display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; background: var(--paper); position: sticky; top: 0; z-index: 8; border-bottom: 1px solid rgba(227,230,232,.8);
+    }
+    .topbar-title { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .topbar-subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .icon-btn {
+      width: 44px; height: 44px; display: inline-grid; place-items: center; border: 0; border-radius: 50%;
+      background: transparent; color: var(--ink); flex: 0 0 auto;
+    }
+    .icon-btn:hover { background: #f0f2f3; }
+    .back-btn { margin-left: -10px; }
+    .top-actions { display: flex; align-items: center; }
+    .content { padding: 16px; }
+
+    .next-ride {
+      background: var(--dark); color: #fff; padding: 15px 16px; display: grid;
+      grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+    }
+    .next-kicker { color: #aeb5b9; font-size: 12px; }
+    .next-title { font-weight: 700; margin: 4px 0 6px; }
+    .next-meta { color: #dfe3e5; font-size: 12px; }
+    .next-ride .icon-btn { color: #fff; background: rgba(255,255,255,.1); }
+    .searchbox { margin: 14px 16px 10px; position: relative; }
+    .searchbox input {
+      width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
+      padding: 0 42px; color: var(--ink); outline: none;
+    }
+    .searchbox input:focus { border-color: var(--dark); }
+    .searchbox svg { position: absolute; left: 14px; top: 14px; color: var(--muted); }
+    .filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 14px; scrollbar-width: none; }
+    .chip {
+      min-height: 34px; white-space: nowrap; padding: 0 13px; border-radius: 17px; border: 1px solid var(--line);
+      color: var(--ink); background: var(--paper); font-size: 13px;
+    }
+    .chip.active { background: var(--dark); color: #fff; border-color: var(--dark); }
+    .section-head { display: flex; align-items: end; justify-content: space-between; margin: 2px 0 12px; }
+    .section-head h2 { margin: 0; font-size: 18px; }
+    .section-head button { border: 0; color: var(--muted); background: transparent; font-size: 13px; }
+
+    .feature-event { border-radius: 8px; overflow: hidden; background: var(--paper); border: 1px solid var(--line); }
+    .feature-image { height: 176px; position: relative; overflow: hidden; }
+    .feature-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .image-badges { position: absolute; left: 12px; top: 12px; display: flex; gap: 6px; }
+    .badge { border-radius: 12px; padding: 4px 8px; font-size: 11px; font-weight: 700; background: var(--paper); color: var(--ink); }
+    .badge.red { color: #a32b26; background: var(--red-soft); }
+    .badge.green { color: var(--green); background: var(--green-soft); }
+    .badge.amber { color: var(--amber); background: var(--amber-soft); }
+    .feature-body { padding: 14px; }
+    .eyebrow { color: var(--red); font-size: 12px; font-weight: 700; }
+    .event-title { margin: 5px 0 8px; font-size: 18px; line-height: 1.35; }
+    .meta-line { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .meta-line svg { width: 15px; height: 15px; flex: 0 0 auto; }
+    .metric-row { display: grid; grid-template-columns: repeat(4,1fr); border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+    .metric { text-align: center; border-right: 1px solid var(--line); }
+    .metric:last-child { border-right: 0; }
+    .metric strong { display: block; font-size: 15px; }
+    .metric span { color: var(--muted); font-size: 10px; }
+    .text-btn { width: 100%; min-height: 44px; border: 0; border-radius: 6px; font-weight: 700; }
+    .text-btn.primary { color: #fff; background: var(--red); }
+    .text-btn.secondary { color: var(--ink); background: #eef0f1; }
+    .text-btn.dark { color: #fff; background: var(--dark); }
+    .feature-body .text-btn { margin-top: 14px; }
+
+    .route-strip { display: grid; grid-auto-flow: column; grid-auto-columns: 82%; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+    .route-card { border: 1px solid var(--line); background: var(--paper); border-radius: 8px; overflow: hidden; text-align: left; padding: 0; }
+    .route-card img { width: 100%; height: 104px; object-fit: cover; display: block; }
+    .route-copy { padding: 11px 12px 12px; }
+    .route-copy strong { display: block; }
+    .route-copy span { color: var(--muted); font-size: 12px; }
+    .list-event { margin-top: 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 13px; }
+    .list-event h3 { margin: 6px 0 8px; font-size: 16px; }
+    .list-event-top { display: flex; justify-content: space-between; gap: 12px; }
+    .members { color: var(--muted); font-size: 12px; }
+
+    .detail-hero { height: 240px; position: relative; background: var(--dark); }
+    .detail-hero img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .88; }
+    .detail-overlay { position: absolute; inset: 0; padding: 12px 14px; display: flex; justify-content: space-between; align-items: flex-start; background: rgba(0,0,0,.18); }
+    .detail-overlay .icon-btn { color: #fff; background: rgba(15,17,19,.45); }
+    .detail-panel { margin-top: -18px; position: relative; z-index: 2; background: var(--paper); border-radius: 8px 8px 0 0; padding: 18px 16px 8px; }
+    .detail-panel h1 { font-size: 22px; line-height: 1.35; margin: 8px 0 10px; }
+    .organizer { display: flex; align-items: center; gap: 10px; padding: 12px 0 4px; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--dark); color: #fff; font-weight: 700; }
+    .organizer small { color: var(--muted); }
+    .detail-section { background: var(--paper); padding: 17px 16px; border-top: 8px solid #f4f5f6; }
+    .detail-section h2 { font-size: 17px; margin: 0 0 12px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
+    .info-item { display: flex; gap: 9px; align-items: flex-start; }
+    .info-item svg { color: var(--muted); width: 18px; margin-top: 2px; }
+    .info-item strong { display: block; font-size: 14px; }
+    .info-item span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .route-preview { height: 154px; background: #e9edeb; position: relative; overflow: hidden; border-radius: 6px; }
+    .map-grid { position:absolute; inset:0; opacity:.65; background-image: linear-gradient(#ced6d2 1px, transparent 1px), linear-gradient(90deg,#ced6d2 1px,transparent 1px); background-size: 34px 34px; transform: rotate(-9deg) scale(1.3); }
+    .route-preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .route-preview-label { position:absolute; right:10px; top:10px; background:var(--paper); padding:5px 8px; border-radius:4px; font-size:11px; }
+    .requirement-list { display: grid; gap: 10px; }
+    .requirement { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; line-height: 1.5; }
+    .requirement svg { color: var(--green); width: 17px; margin-top: 2px; }
+    .sticky-action { position: sticky; bottom: 0; z-index: 9; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: rgba(255,255,255,.96); border-top: 1px solid var(--line); display: flex; gap: 10px; }
+    .sticky-action .text-btn { flex: 1; }
+    .sticky-action .icon-btn { border: 1px solid var(--line); border-radius: 8px; }
+
+    .route-map { height: 320px; background: #dfe6e2; position: relative; overflow: hidden; }
+    .route-map .map-grid { background-size: 46px 46px; }
+    .route-map canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .map-top { position: absolute; z-index: 2; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; }
+    .map-top .icon-btn { background: var(--paper); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+    .route-summary { margin-top: -22px; position: relative; z-index: 3; background: var(--paper); border-radius: 8px 8px 0 0; padding: 18px 16px 14px; }
+    .route-summary h1 { margin: 7px 0 6px; font-size: 21px; }
+    .elevation { height: 112px; width: 100%; display: block; }
+    .poi-list { display: grid; }
+    .poi { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .poi:last-child { border-bottom: 0; }
+    .poi-icon { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items:center; color: #fff; background: var(--green); }
+    .poi-icon.warn { background: var(--amber); }
+    .poi small { color: var(--muted); }
+
+    .segmented { display: grid; grid-template-columns: 1fr 1fr; background: #eceeef; border-radius: 6px; padding: 3px; }
+    .segmented button { min-height: 36px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); }
+    .segmented button.active { background: var(--paper); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.08); font-weight: 700; }
+    .publish-intro { padding: 18px 16px 8px; background: var(--paper); }
+    .publish-intro h1 { margin: 0 0 7px; font-size: 22px; }
+    .publish-intro p { color: var(--muted); margin: 0; font-size: 13px; }
+    .stepper { display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; margin-top: 18px; }
+    .step { height: 4px; background: #e0e3e4; border-radius: 2px; }
+    .step.done { background: var(--red); }
+    .form-section { padding: 18px 16px; background: var(--paper); border-top: 8px solid #f4f5f6; }
+    .form-section h2 { font-size: 17px; margin: 0 0 15px; }
+    .field { margin-bottom: 15px; }
+    .field label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 7px; }
+    .field input, .field select, .field textarea {
+      width: 100%; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); padding: 11px 12px; outline: none;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--dark); }
+    .field textarea { resize: vertical; min-height: 82px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .requirement-builder { border-top: 1px solid var(--line); padding-top: 15px; margin-top: 4px; }
+    .requirement-group { margin-bottom: 18px; }
+    .requirement-group-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .requirement-group-head strong { font-size: 14px; }
+    .requirement-group-head span { color: var(--muted); font-size: 11px; }
+    .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .option-check {
+      min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+      border: 1px solid var(--line); border-radius: 6px; background: var(--paper); font-size: 13px;
+    }
+    .option-check:has(input:checked) { border-color: #e8aaa6; background: var(--red-soft); color: #8e2b26; }
+    .option-check input { width: 17px; height: 17px; margin: 0; accent-color: var(--red); flex: 0 0 auto; }
+    .requirement-summary { display: flex; align-items: flex-start; gap: 9px; padding: 11px 12px; border-left: 3px solid var(--green); background: var(--green-soft); color: #105b41; font-size: 12px; line-height: 1.55; }
+    .requirement-summary svg { width: 16px; height: 16px; margin-top: 1px; flex: 0 0 auto; }
+    .route-select { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; gap: 10px; align-items: center; }
+    .route-thumb { width: 64px; height: 58px; border-radius: 6px; object-fit: cover; }
+    .route-select strong { display: block; font-size: 14px; }
+    .route-select small { color: var(--muted); }
+
+    .profile-head { background: var(--dark); color: #fff; padding: 18px 16px 22px; }
+    .profile-row { display: flex; align-items: center; gap: 13px; }
+    .profile-head .avatar { width: 56px; height: 56px; background: var(--red); }
+    .profile-name { font-size: 20px; font-weight: 700; }
+    .profile-note { color: #bcc2c5; font-size: 12px; margin-top: 5px; }
+    .profile-stats { display: grid; grid-template-columns: repeat(3,1fr); margin-top: 20px; }
+    .profile-stats div { border-right: 1px solid #3a3e41; text-align: center; }
+    .profile-stats div:last-child { border-right: 0; }
+    .profile-stats strong { display: block; }
+    .profile-stats span { color: #aeb5b9; font-size: 11px; }
+    .status-card { margin: 14px 16px 0; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+    .status-top { display: flex; justify-content: space-between; align-items: center; }
+    .status-card h3 { margin: 9px 0 6px; font-size: 16px; }
+    .menu-list { margin-top: 12px; background: var(--paper); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .menu-item { width: 100%; min-height: 52px; padding: 0 16px; display:flex; align-items:center; gap:11px; border:0; border-bottom:1px solid var(--line); background:var(--paper); color:var(--ink); text-align:left; }
+    .menu-item:last-child { border-bottom:0; }
+    .menu-item span { flex:1; }
+    .menu-item small { color:var(--muted); }
+
+    .bottom-nav { flex: 0 0 68px; height: 68px; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--paper); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 10; }
+    .nav-item { border: 0; background: transparent; color: var(--muted); display: flex; flex-direction: column; align-items:center; justify-content:center; gap:3px; font-size: 10px; }
+    .nav-item.active { color: var(--red); font-weight: 700; }
+    .nav-item svg { width: 21px; height: 21px; }
+
+    .sheet-backdrop { position: absolute; inset: 0; background: rgba(8,10,11,.52); z-index: 20; display: none; align-items: end; }
+    .sheet-backdrop.open { display: flex; }
+    .sheet { width: 100%; max-height: 84%; overflow-y: auto; background: var(--paper); border-radius: 12px 12px 0 0; padding: 10px 16px 18px; animation: rise .22s ease-out; }
+    @keyframes rise { from { transform: translateY(20px); opacity: .6; } }
+    .sheet-handle { width: 42px; height: 4px; border-radius: 2px; background: #cdd1d3; margin: 0 auto 12px; }
+    .sheet-head { display: flex; justify-content: space-between; align-items:center; }
+    .sheet-head h2 { margin:0; font-size:19px; }
+    .check-row { display:flex; align-items:flex-start; gap:9px; margin:14px 0; font-size:13px; line-height:1.55; }
+    .check-row input { width:18px; height:18px; margin-top:2px; accent-color:var(--red); }
+    .success-state { text-align:center; padding: 26px 10px 10px; }
+    .success-icon { width:58px; height:58px; margin:0 auto 14px; border-radius:50%; display:grid; place-items:center; background:var(--green-soft); color:var(--green); }
+    .success-state h2 { margin:0 0 8px; }
+    .success-state p { color:var(--muted); font-size:13px; line-height:1.6; }
+    .toast { position:absolute; z-index:30; left:50%; bottom:88px; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 14px; border-radius:6px; font-size:12px; white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .2s; }
+    .toast.show { opacity:1; }
+
+    @media (max-width: 820px) {
+      .workspace { display:block; padding:0; min-height:100vh; }
+      .review-panel { display:none; }
+      .phone { width:100%; height:100vh; border:0; border-radius:0; box-shadow:none; max-width:none; }
+    }
+    @media (max-width: 360px) {
+      .content, .detail-section, .form-section { padding-left:12px; padding-right:12px; }
+      .metric strong { font-size:13px; }
+      .field-row { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="workspace">
+    <aside class="review-panel" aria-label="原型页面索引">
+      <div class="brand-lockup">
+        <div class="brand-mark"><i data-lucide="route" aria-hidden="true"></i></div>
+        <div><div class="brand-name">风迹</div><div class="brand-en">VELO TRACE / UI PROTOTYPE</div></div>
+      </div>
+      <h1>骑行活动，从约人到出发</h1>
+      <p>首版聚焦活动发布、报名和路书三件事。右侧为可操作的小程序高保真原型。</p>
+      <nav class="prototype-nav">
+        <button class="active" data-screen-link="home"><i data-lucide="calendar-days"></i><span>01 · 活动发现</span></button>
+        <button data-screen-link="detail"><i data-lucide="file-text"></i><span>02 · 活动详情与报名</span></button>
+        <button data-screen-link="route"><i data-lucide="map"></i><span>03 · 路书详情</span></button>
+        <button data-screen-link="publish"><i data-lucide="circle-plus"></i><span>04 · 发布活动</span></button>
+        <button data-screen-link="profile"><i data-lucide="user-round"></i><span>05 · 我的活动</span></button>
+      </nav>
+      <div class="review-note">点击活动卡片、报名按钮、路书卡片和底部导航可体验主流程。原型状态会在页面间同步。</div>
+    </aside>
+
+    <section class="phone" aria-label="风迹小程序交互原型">
+      <div class="app">
+        <div class="statusbar"><span>9:41</span><span class="status-icons"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></span></div>
+        <div class="main" id="mainScroll">
+          <section class="screen active" id="screen-home">
+            <header class="topbar">
+              <div><div class="topbar-title">北京 <i data-lucide="chevron-down"></i></div><div class="topbar-subtitle">晴 26°C · 适合骑行</div></div>
+              <button class="icon-btn" aria-label="发布活动" data-go="publish"><i data-lucide="plus"></i></button>
+            </header>
+            <div class="next-ride" id="nextRide" hidden>
+              <div><div class="next-kicker">下一场骑行 · 已报名</div><div class="next-title">妙峰山晨骑挑战</div><div class="next-meta">周六 06:30 · 苹果园地铁站</div></div>
+              <button class="icon-btn" aria-label="查看活动" data-go="detail"><i data-lucide="arrow-right"></i></button>
+            </div>
+            <div class="searchbox"><i data-lucide="search" aria-hidden="true"></i><input aria-label="搜索活动或路书" placeholder="搜索活动、路书或发起人"></div>
+            <div class="filter-row" aria-label="活动筛选">
+              <button class="chip active">本周末</button><button class="chip">100km 内</button><button class="chip">新手友好</button><button class="chip">爬坡</button>
+            </div>
+            <div class="content">
+              <div class="section-head"><h2>近期活动</h2><button>查看全部</button></div>
+              <article class="feature-event">
+                <div class="feature-image"><img src="assets/ride-group.jpg" alt="公路车骑行队伍"><div class="image-badges"><span class="badge red">报名中</span><span class="badge">审核制</span></div></div>
+                <div class="feature-body">
+                  <div class="eyebrow">8月8日 周六 · 06:30</div>
+                  <h3 class="event-title">妙峰山晨骑挑战</h3>
+                  <div class="meta-line"><i data-lucide="map-pin"></i>苹果园地铁站 A 口集合</div>
+                  <div class="metric-row">
+                    <div class="metric"><strong>82 km</strong><span>距离</span></div><div class="metric"><strong>1,260 m</strong><span>爬升</span></div><div class="metric"><strong>24–28</strong><span>均速 km/h</span></div><div class="metric"><strong>23/30</strong><span>人数</span></div>
+                  </div>
+                  <button class="text-btn primary" data-go="detail">查看活动</button>
+                </div>
+              </article>
+
+              <div class="section-head" style="margin-top:22px"><h2>精选路书</h2><button data-go="route">更多</button></div>
+              <div class="route-strip">
+                <button class="route-card" data-go="route"><img src="assets/route-mountain-v2.jpg" alt="沿海公路骑行者"><div class="route-copy"><strong>十三陵水库环线</strong><span>67 km · 爬升 680 m · 中等</span></div></button>
+                <button class="route-card" data-go="route"><img src="assets/ride-hero.jpg" alt="城市道路骑行者"><div class="route-copy"><strong>通州运河轻松线</strong><span>42 km · 爬升 120 m · 轻松</span></div></button>
+              </div>
+
+              <div class="section-head" style="margin-top:22px"><h2>更多选择</h2></div>
+              <article class="list-event"><div class="list-event-top"><span class="badge green">新手友好</span><span class="members">11 / 20 人</span></div><h3>温榆河绿道咖啡骑</h3><div class="meta-line"><i data-lucide="clock"></i>8月9日 07:00 · 38 km · 均速 20–23</div></article>
+              <article class="list-event"><div class="list-event-top"><span class="badge amber">即将满员</span><span class="members">17 / 18 人</span></div><h3>戒台寺夜爬训练</h3><div class="meta-line"><i data-lucide="clock"></i>8月12日 19:30 · 45 km · 爬升 720 m</div></article>
+            </div>
+          </section>
+
+          <section class="screen" id="screen-detail">
+            <div class="detail-hero"><img src="assets/ride-group.jpg" alt="妙峰山晨骑活动封面"><div class="detail-overlay"><button class="icon-btn" aria-label="返回" data-go="home"><i data-lucide="arrow-left"></i></button><div class="top-actions"><button class="icon-btn" aria-label="收藏"><i data-lucide="bookmark"></i></button><button class="icon-btn" aria-label="分享"><i data-lucide="share-2"></i></button></div></div></div>
+            <div class="detail-panel">
+              <div><span class="badge red" id="detailStatus">报名中</span> <span class="badge">公路车 · 进阶</span></div>
+              <h1>妙峰山晨骑挑战</h1>
+              <div class="meta-line"><i data-lucide="calendar-days"></i>8月8日 周六 06:30–12:30</div>
+              <div class="meta-line"><i data-lucide="map-pin"></i>苹果园地铁站 A 口集合</div>
+              <div class="metric-row">
+                <div class="metric"><strong>82 km</strong><span>距离</span></div><div class="metric"><strong>1,260 m</strong><span>爬升</span></div><div class="metric"><strong>24–28</strong><span>均速</span></div><div class="metric"><strong id="capacityMetric">23/30</strong><span>人数</span></div>
+              </div>
+              <div class="organizer"><div class="avatar">北</div><div><strong>北风骑行社</strong><br><small>认证组织者 · 已发起 48 场</small></div></div>
+            </div>
+            <section class="detail-section"><h2>路线概览</h2><div class="route-preview" data-go="route"><div class="map-grid"></div><canvas class="route-canvas" aria-label="妙峰山骑行路线缩略图"></canvas><span class="route-preview-label">查看完整路书</span></div></section>
+            <section class="detail-section"><h2>参加要求</h2><div class="requirement-list"><div class="requirement"><i data-lucide="circle-check"></i><span>近 30 天内完成过 70 km 以上公路骑行</span></div><div class="requirement"><i data-lucide="circle-check"></i><span>必须佩戴头盔，自备补胎工具、前后车灯</span></div><div class="requirement"><i data-lucide="triangle-alert" style="color:var(--amber)"></i><span>连续爬坡约 11 km，返程含连续弯道，请谨慎评估能力</span></div></div></section>
+            <section class="detail-section"><h2>活动说明</h2><p style="font-size:13px;line-height:1.75;margin:0;color:var(--muted)">全程不拉爆，山脚按能力分组。妙峰山顶统一合影，返程在担礼村补给。遇中雨或道路管制将提前取消并通知。</p></section>
+            <div class="sticky-action"><button class="icon-btn" aria-label="联系组织者"><i data-lucide="message-circle"></i></button><button class="text-btn primary" id="registerButton">报名参加 · 剩余 7 位</button></div>
+          </section>
+
+          <section class="screen" id="screen-route">
+            <div class="route-map"><div class="map-grid"></div><canvas id="routeCanvas" aria-label="十三陵水库环线路线图"></canvas><div class="map-top"><button class="icon-btn" aria-label="返回" data-go="home"><i data-lucide="arrow-left"></i></button><button class="icon-btn" aria-label="定位路线"><i data-lucide="locate-fixed"></i></button></div></div>
+            <div class="route-summary"><span class="badge green">官方精选 · 中等</span><h1>十三陵水库环线</h1><div class="meta-line"><i data-lucide="map-pin"></i>北京市昌平区 · 环线</div><div class="metric-row"><div class="metric"><strong>67 km</strong><span>距离</span></div><div class="metric"><strong>680 m</strong><span>爬升</span></div><div class="metric"><strong>3h 10m</strong><span>预计</span></div><div class="metric"><strong>8.6%</strong><span>最大坡度</span></div></div></div>
+            <section class="detail-section"><div class="section-head"><h2>海拔曲线</h2><span style="color:var(--muted);font-size:12px">最高 412 m</span></div><canvas class="elevation" id="elevationCanvas" aria-label="路书海拔曲线"></canvas></section>
+            <section class="detail-section"><h2>沿途关键点</h2><div class="poi-list"><div class="poi"><span class="poi-icon"><i data-lucide="coffee"></i></span><div><strong>十三陵水库便利店</strong><br><small>24.6 km · 补水和简餐</small></div><small>补给</small></div><div class="poi"><span class="poi-icon warn"><i data-lucide="triangle-alert"></i></span><div><strong>蟒山连续弯道</strong><br><small>41.8 km · 下坡控制速度</small></div><small>风险</small></div><div class="poi"><span class="poi-icon"><i data-lucide="wrench"></i></span><div><strong>捷安特昌平店</strong><br><small>61.2 km · 维修点</small></div><small>维修</small></div></div></section>
+            <div class="sticky-action"><button class="icon-btn" aria-label="收藏路书"><i data-lucide="bookmark"></i></button><button class="text-btn secondary" id="offlineButton">下载离线</button><button class="text-btn dark" id="trackButton">轨迹跟随</button></div>
+          </section>
+
+          <section class="screen" id="screen-publish">
+            <header class="topbar"><div class="topbar-title">发布活动</div><button class="icon-btn" aria-label="关闭" data-go="home"><i data-lucide="x"></i></button></header>
+            <div class="publish-intro"><h1>创建一场骑行</h1><p>活动信息会直接影响骑友是否报名，请准确填写。</p><div class="stepper" aria-label="步骤 1 / 4"><span class="step done"></span><span class="step"></span><span class="step"></span><span class="step"></span></div></div>
+            <section class="form-section"><h2>01 · 路书与基础信息</h2><div class="field"><label>活动路书</label><div class="route-select"><img class="route-thumb" src="assets/route-mountain-v2.jpg" alt="所选路书封面"><div style="flex:1"><strong>十三陵水库环线</strong><small>67 km · 爬升 680 m</small></div><i data-lucide="chevron-right"></i></div></div><div class="field"><label for="eventName">活动名称</label><input id="eventName" value="十三陵水库周末拉练"></div><div class="field-row"><div class="field"><label for="eventDate">出发日期</label><input id="eventDate" type="date" value="2026-08-15"></div><div class="field"><label for="eventTime">集合时间</label><input id="eventTime" type="time" value="06:30"></div></div><div class="field"><label for="meeting">集合地点</label><input id="meeting" value="北邵洼地铁站 B 口"></div></section>
+            <section class="form-section">
+              <h2>强度预设</h2>
+              <div class="field-row"><div class="field"><label for="speed">目标均速</label><select id="speed"><option>22–25 km/h</option><option selected>24–28 km/h</option><option>28–32 km/h</option></select></div><div class="field"><label for="capacity">人数上限</label><input id="capacity" type="number" value="20" min="2" max="100"></div></div>
+              <div class="requirement-builder">
+                <div class="requirement-group">
+                  <div class="requirement-group-head"><strong>必备装备</strong><span>可多选</span></div>
+                  <div class="option-grid">
+                    <label class="option-check"><input class="requirement-option" type="checkbox" checked><span>骑行头盔</span></label>
+                    <label class="option-check"><input class="requirement-option" type="checkbox" checked><span>前后车灯</span></label>
+                    <label class="option-check"><input class="requirement-option" type="checkbox" checked><span>补胎工具</span></label>
+                    <label class="option-check"><input class="requirement-option" type="checkbox" checked><span>备用内胎</span></label>
+                    <label class="option-check"><input class="requirement-option" type="checkbox"><span>锁鞋</span></label>
+                    <label class="option-check"><input class="requirement-option" type="checkbox"><span>对讲设备</span></label>
+                  </div>
+                </div>
+                <div class="requirement-group">
+                  <div class="requirement-group-head"><strong>能力门槛</strong><span>用于报名资格判断</span></div>
+                  <div class="field-row">
+                    <div class="field"><label for="recentDistance">近 30 天单次距离</label><select id="recentDistance"><option>不限</option><option>完成过 40 km</option><option selected>完成过 60 km</option><option>完成过 100 km</option></select></div>
+                    <div class="field"><label for="recentClimb">近 30 天单次爬升</label><select id="recentClimb"><option>不限</option><option>完成过 500 m</option><option selected>完成过 800 m</option><option>完成过 1,500 m</option></select></div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field"><label for="bikeType">允许车型</label><select id="bikeType"><option selected>公路车 / 弯把瓜车</option><option>仅公路车</option><option>不限车型</option></select></div>
+                    <div class="field"><label for="dropPolicy">掉队安排</label><select id="dropPolicy"><option selected>设收队，不轻易丢人</option><option>分组骑行</option><option>竞技拉练，自行返程</option></select></div>
+                  </div>
+                </div>
+                <div class="requirement-group">
+                  <div class="requirement-group-head"><strong>骑行纪律</strong><span>报名时需确认</span></div>
+                  <div class="option-grid">
+                    <label class="option-check"><input class="requirement-option" type="checkbox" checked><span>服从领队指挥</span></label>
+                    <label class="option-check"><input class="requirement-option" type="checkbox" checked><span>禁止佩戴耳机</span></label>
+                    <label class="option-check"><input class="requirement-option" type="checkbox" checked><span>遵守交通规则</span></label>
+                    <label class="option-check"><input class="requirement-option" type="checkbox"><span>统一队服</span></label>
+                  </div>
+                </div>
+                <div class="field"><label for="requirements">补充说明</label><textarea id="requirements" placeholder="例如天气取消条件、特殊路况或补给要求">山顶温差较大，建议携带轻量风衣；活动前一晚检查胎压和刹车状态。</textarea></div>
+                <div class="requirement-summary"><i data-lucide="shield-check" aria-hidden="true"></i><span id="requirementSummary">已设置 7 项必备要求，并启用距离、爬升与车型门槛。</span></div>
+              </div>
+              <button class="text-btn primary" id="nextPublish" style="margin-top:16px">下一步 · 报名设置</button>
+            </section>
+          </section>
+
+          <section class="screen" id="screen-profile">
+            <div class="profile-head"><div class="profile-row"><div class="avatar">林</div><div><div class="profile-name">林川</div><div class="profile-note">北京 · 骑行 3 年 · 认证骑友</div></div></div><div class="profile-stats"><div><strong>1,284 km</strong><span>本赛季</span></div><div><strong>26.4</strong><span>常用均速</span></div><div><strong>8,620 m</strong><span>累计爬升</span></div></div></div>
+            <div class="status-card" id="profileRide"><div class="status-top"><span class="badge amber">待报名</span><span style="font-size:12px;color:var(--muted)">8月8日</span></div><h3>妙峰山晨骑挑战</h3><div class="meta-line"><i data-lucide="clock"></i>06:30 · 苹果园地铁站</div><button class="text-btn secondary" style="margin-top:12px" data-go="detail">查看活动</button></div>
+            <div class="content" style="padding-bottom:4px"><div class="segmented"><button class="active">我报名的</button><button>我发布的</button></div></div>
+            <div class="menu-list"><button class="menu-item"><i data-lucide="clipboard-list"></i><span>全部活动记录</span><small>6</small><i data-lucide="chevron-right"></i></button><button class="menu-item"><i data-lucide="route"></i><span>我的路书与收藏</span><small>12</small><i data-lucide="chevron-right"></i></button><button class="menu-item"><i data-lucide="contact-round"></i><span>紧急联系人</span><small>已设置</small><i data-lucide="chevron-right"></i></button><button class="menu-item"><i data-lucide="shield-check"></i><span>认证与信用</span><small>信用良好</small><i data-lucide="chevron-right"></i></button><button class="menu-item"><i data-lucide="settings"></i><span>设置与隐私</span><i data-lucide="chevron-right"></i></button></div>
+          </section>
+        </div>
+
+        <nav class="bottom-nav" aria-label="主导航">
+          <button class="nav-item active" data-go="home"><i data-lucide="calendar-days"></i><span>活动</span></button>
+          <button class="nav-item" data-go="route"><i data-lucide="map"></i><span>路书</span></button>
+          <button class="nav-item" data-go="publish"><i data-lucide="circle-plus"></i><span>发布</span></button>
+          <button class="nav-item" data-go="profile"><i data-lucide="user-round"></i><span>我的</span></button>
+        </nav>
+      </div>
+
+      <div class="sheet-backdrop" id="registrationSheet" role="dialog" aria-modal="true" aria-labelledby="registrationTitle">
+        <div class="sheet"><div class="sheet-handle"></div><div id="registrationForm"><div class="sheet-head"><h2 id="registrationTitle">确认报名</h2><button class="icon-btn" aria-label="关闭报名弹层" id="closeSheet"><i data-lucide="x"></i></button></div><p style="color:var(--muted);font-size:13px">妙峰山晨骑挑战 · 8月8日 06:30</p><div class="field-row"><div class="field"><label for="phone">联系电话</label><input id="phone" value="138****6721"></div><div class="field"><label for="bike">车辆类型</label><select id="bike"><option>公路车</option><option>瓜车</option></select></div></div><div class="field"><label for="emergency">紧急联系人</label><input id="emergency" value="林先生 · 136****1048"></div><label class="check-row"><input type="checkbox" id="abilityCheck"><span>我确认近期骑行能力符合活动要求，并会携带头盔、车灯和补胎工具。</span></label><label class="check-row"><input type="checkbox" id="waiverCheck"><span>我已阅读并同意活动风险说明、取消规则和个人信息使用说明。</span></label><button class="text-btn primary" id="submitRegistration">提交报名</button></div><div class="success-state" id="registrationSuccess" hidden><div class="success-icon"><i data-lucide="circle-check-big"></i></div><h2>报名已提交</h2><p>组织者将在 24 小时内审核。审核结果和活动变更会通过服务通知发送。</p><button class="text-btn dark" id="finishRegistration">查看我的活动</button></div></div>
+      </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script>
+    const screens = [...document.querySelectorAll('.screen')];
+    const navItems = [...document.querySelectorAll('.nav-item')];
+    const prototypeLinks = [...document.querySelectorAll('[data-screen-link]')];
+    const mainScroll = document.getElementById('mainScroll');
+    let registrationSubmitted = false;
+
+    function showScreen(name) {
+      screens.forEach(screen => screen.classList.toggle('active', screen.id === `screen-${name}`));
+      navItems.forEach(item => item.classList.toggle('active', item.dataset.go === name));
+      prototypeLinks.forEach(item => item.classList.toggle('active', item.dataset.screenLink === name));
+      mainScroll.scrollTop = 0;
+      if (name === 'route' || name === 'detail') requestAnimationFrame(drawAllCharts);
+      if (window.lucide) lucide.createIcons();
+    }
+
+    document.addEventListener('click', event => {
+      const trigger = event.target.closest('[data-go], [data-screen-link]');
+      if (trigger) showScreen(trigger.dataset.go || trigger.dataset.screenLink);
+      const chip = event.target.closest('.chip');
+      if (chip) chip.classList.toggle('active');
+    });
+
+    const sheet = document.getElementById('registrationSheet');
+    document.getElementById('registerButton').addEventListener('click', () => {
+      if (registrationSubmitted) return showScreen('profile');
+      sheet.classList.add('open');
+    });
+    document.getElementById('closeSheet').addEventListener('click', () => sheet.classList.remove('open'));
+    sheet.addEventListener('click', event => { if (event.target === sheet) sheet.classList.remove('open'); });
+
+    document.getElementById('submitRegistration').addEventListener('click', () => {
+      const ability = document.getElementById('abilityCheck');
+      const waiver = document.getElementById('waiverCheck');
+      if (!ability.checked || !waiver.checked) return showToast('请先确认能力要求与风险说明');
+      registrationSubmitted = true;
+      document.getElementById('registrationForm').hidden = true;
+      document.getElementById('registrationSuccess').hidden = false;
+      document.getElementById('nextRide').hidden = false;
+      document.getElementById('detailStatus').textContent = '等待审核';
+      document.getElementById('detailStatus').className = 'badge amber';
+      document.getElementById('registerButton').textContent = '查看报名状态';
+      document.getElementById('capacityMetric').textContent = '24/30';
+      document.getElementById('profileRide').querySelector('.badge').textContent = '等待审核';
+    });
+    document.getElementById('finishRegistration').addEventListener('click', () => { sheet.classList.remove('open'); showScreen('profile'); });
+    document.getElementById('offlineButton').addEventListener('click', () => showToast('离线路书已加入下载队列'));
+    document.getElementById('trackButton').addEventListener('click', () => showToast('轨迹跟随已开启 · 请注意骑行安全'));
+    document.getElementById('nextPublish').addEventListener('click', () => showToast('草稿已保存 · 进入第 2 步'));
+    document.querySelectorAll('.requirement-option').forEach(option => option.addEventListener('change', () => {
+      const selected = document.querySelectorAll('.requirement-option:checked').length;
+      document.getElementById('requirementSummary').textContent = `已设置 ${selected} 项必备要求，并启用距离、爬升与车型门槛。`;
+    }));
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    function setupCanvas(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, width: rect.width, height: rect.height };
+    }
+
+    function drawRoute(canvas) {
+      const { ctx, width, height } = setupCanvas(canvas);
+      const points = [[.13,.75],[.22,.67],[.19,.52],[.31,.42],[.43,.46],[.54,.30],[.67,.23],[.78,.35],[.85,.53],[.74,.66],[.59,.70],[.47,.61],[.35,.72],[.22,.79]];
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 8; ctx.beginPath();
+      points.forEach(([x,y],i) => i ? ctx.lineTo(x*width,y*height) : ctx.moveTo(x*width,y*height)); ctx.stroke();
+      ctx.strokeStyle = '#d9433b'; ctx.lineWidth = 4; ctx.beginPath();
+      points.forEach(([x,y],i) => i ? ctx.lineTo(x*width,y*height) : ctx.moveTo(x*width,y*height)); ctx.stroke();
+      [[points[0],'#147a55'],[points[6],'#a86400'],[points[points.length-1],'#17191b']].forEach(([p,color]) => { ctx.fillStyle=color;ctx.beginPath();ctx.arc(p[0]*width,p[1]*height,6,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke(); });
+    }
+
+    function drawElevation() {
+      const canvas = document.getElementById('elevationCanvas');
+      const { ctx, width, height } = setupCanvas(canvas);
+      const vals = [.22,.25,.24,.29,.34,.49,.61,.72,.58,.47,.52,.69,.82,.68,.51,.42,.35,.31,.38,.27,.22];
+      const pad = 8;
+      ctx.strokeStyle = '#dfe3e4'; ctx.lineWidth = 1;
+      [0.25,0.5,0.75].forEach(y => { ctx.beginPath();ctx.moveTo(0,height*y);ctx.lineTo(width,height*y);ctx.stroke(); });
+      ctx.beginPath(); vals.forEach((v,i) => { const x=pad+i*(width-pad*2)/(vals.length-1),y=height-pad-v*(height-pad*2); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+      ctx.lineTo(width-pad,height-pad);ctx.lineTo(pad,height-pad);ctx.closePath();ctx.fillStyle='rgba(20,122,85,.14)';ctx.fill();
+      ctx.beginPath(); vals.forEach((v,i) => { const x=pad+i*(width-pad*2)/(vals.length-1),y=height-pad-v*(height-pad*2); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+      ctx.strokeStyle='#147a55';ctx.lineWidth=3;ctx.stroke();
+    }
+
+    function drawAllCharts() { document.querySelectorAll('.route-canvas').forEach(drawRoute); drawRoute(document.getElementById('routeCanvas')); drawElevation(); }
+    window.addEventListener('resize', drawAllCharts);
+    if (window.lucide) lucide.createIcons();
+    requestAnimationFrame(drawAllCharts);
+  </script>
+</body>
+</html>

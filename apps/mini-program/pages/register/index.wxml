@@ -1,0 +1,24 @@
+<view class="page register-page">
+  <view wx:if="{{loading}}" class="loading"><text class="loading-dot"></text>正在确认活动名额</view>
+  <view wx:elif="{{success}}" class="success-state">
+    <view class="success-mark">✓</view><view class="success-title">报名已提交</view>
+    <view class="success-copy">{{successCopy}}</view>
+    <button class="button button-dark" bindtap="goMine">查看我的活动</button>
+  </view>
+  <block wx:elif="{{event}}">
+    <view class="event-brief"><text class="badge badge-red">确认报名</text><view class="brief-title">{{event.title}}</view><view class="meta">{{dateText}}</view><view class="meta">{{event.meetingPoint}}</view></view>
+    <view class="form-section">
+      <view class="form-title">联系与车辆</view>
+      <view class="field"><label class="label required">联系电话</label><input class="input" type="number" maxlength="11" value="{{form.phone}}" data-field="phone" bindinput="onField" /></view>
+      <view class="field"><label class="label required">紧急联系人及电话</label><input class="input" value="{{form.emergencyContact}}" data-field="emergencyContact" bindinput="onField" /></view>
+      <view class="field"><label class="label required">车辆类型</label><picker range="{{bikeTypes}}" value="{{bikeIndex}}" bindchange="chooseBike"><view class="picker"><text>{{form.bikeType}}</text><text>›</text></view></picker></view>
+    </view>
+    <view class="form-section">
+      <view class="form-title">出发前确认</view>
+      <view class="confirm {{form.abilityConfirmed ? 'confirm-on' : ''}}" data-field="abilityConfirmed" bindtap="toggleConfirm"><view class="confirm-box">{{form.abilityConfirmed ? '✓' : ''}}</view><view>我确认近期骑行能力符合活动要求，并会携带全部必备装备。</view></view>
+      <view class="confirm {{form.waiverConfirmed ? 'confirm-on' : ''}}" data-field="waiverConfirmed" bindtap="toggleConfirm"><view class="confirm-box">{{form.waiverConfirmed ? '✓' : ''}}</view><view>我已阅读活动风险说明、取消规则和个人信息使用说明，并同意按队伍纪律骑行。</view></view>
+      <view class="privacy">联系电话仅用于本次活动联系，结束后将按平台策略脱敏或删除。</view>
+    </view>
+    <view class="sticky-actions"><button class="button button-primary" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submit">提交报名</button></view>
+  </block>
+</view>

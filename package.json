@@ -1,0 +1,20 @@
+{
+  "name": "fengji-cycling",
+  "version": "0.1.0",
+  "private": true,
+  "description": "风迹公路骑行活动小程序 MVP",
+  "scripts": {
+    "setup": "npm --prefix apps/api install --workspaces=false && npm --prefix apps/mini-program install --workspaces=false",
+    "build": "npm --prefix apps/api run build && npm --prefix apps/mini-program run typecheck",
+    "dev:api": "npm --prefix apps/api run dev",
+    "test": "npm --prefix apps/api run test && npm --prefix apps/mini-program run test",
+    "test:coverage": "npm --prefix apps/api run test:coverage",
+    "security:scan": "node scripts/security-scan.mjs .",
+    "typecheck": "npm --prefix apps/api run typecheck && npm --prefix apps/mini-program run typecheck",
+    "verify": "node scripts/quality-gate.mjs ."
+  },
+  "engines": {
+    "node": ">=24",
+    "npm": ">=11"
+  }
+}
