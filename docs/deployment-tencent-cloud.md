@@ -4,7 +4,7 @@
 
 ```text
 微信小程序 -> HTTPS 域名 -> Caddy -> NestJS API -> PostgreSQL/PostGIS
-                                             -> Redis
+                                             -> Redis（后续共享限流，可选）
 ```
 
 这是一台服务器的过渡方案，适合内测和早期运营，不具备多可用区和自动故障切换能力。用户量稳定后，优先把 PostgreSQL/PostGIS 和 Redis 迁移到腾讯云托管服务，再把 API 扩展为两台服务器。
@@ -121,6 +121,8 @@ docker compose --env-file deploy/.env.production \
 ```
 
 API 容器启动时会先执行 `npm run migrate:prod`。迁移由数据库中的 `schema_migrations` 表保证幂等，完成后才启动 API。
+
+当前后端尚未使用 Redis，共享限流仍属于生产增强项，因此 Redis 被放在 Compose 的 `cache` profile 中，默认不会启动，也不会阻断 API。以后接入 Redis 后可增加 `--profile cache` 启动。
 
 查看状态和日志：
 
