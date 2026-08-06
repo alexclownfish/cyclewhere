@@ -46,5 +46,6 @@ npm run dev:api
 - `docs/product-architecture.md`：产品范围、业务规则、系统架构和数据模型。
 - `docs/agent-collaboration.md`：Agent 职责、互审机制和交付规则。
 - `docs/quality-and-agent-workflow.md`：测试矩阵、安全检查和发布门禁。
+- `docs/deployment-tencent-cloud.md`：腾讯云单机 Docker、HTTPS、微信合法域名、备份和回滚部署手册。
 - `tests/mvp-acceptance-checklist.md`：上线前验收证据清单。
 - `assets/ATTRIBUTION.md`：演示摄影素材来源。

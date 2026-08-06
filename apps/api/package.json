@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "migrate": "tsx src/migrate.ts",
+    "migrate:prod": "node dist/src/migrate.js",
     "token:demo": "tsx src/create-demo-token.ts",
     "start": "node dist/src/server.js",
     "build": "tsc -p tsconfig.json",
