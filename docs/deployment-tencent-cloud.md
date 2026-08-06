@@ -13,7 +13,7 @@
 
 服务器建议：
 
-- Ubuntu 22.04 LTS 或 24.04 LTS。
+- Ubuntu 22.04/24.04 LTS 或 CentOS Stream 9（截图中的 CentOS 服务器也可以使用本文流程）。
 - 最低 `2 核 4 GB`，建议系统盘 40 GB、数据盘 100 GB 以上。
 - 服务器地域、域名备案主体和微信小程序主体保持一致。
 - 腾讯云安全组只开放 `22`、`80`、`443`，不要开放 `3000`、`5432`、`6379`。
@@ -28,6 +28,8 @@ api.cyclewhere.cn -> 腾讯云服务器公网 IP
 
 ## 2. 安装 Docker 和 Git
 
+### Ubuntu
+
 ```bash
 sudo apt update
 sudo apt install -y ca-certificates curl git
@@ -37,6 +39,24 @@ newgrp docker
 docker --version
 docker compose version
 ```
+
+### CentOS / RHEL
+
+截图中的服务器是 CentOS。请以 `root` 或具有 sudo 权限的用户执行：
+
+```bash
+if command -v dnf >/dev/null 2>&1; then
+  dnf install -y ca-certificates curl git
+else
+  yum install -y ca-certificates curl git
+fi
+curl -fsSL https://get.docker.com | sh
+systemctl enable --now docker
+docker --version
+docker compose version
+```
+
+如果 CentOS 7 安装脚本提示系统版本不再受支持，建议把腾讯云系统重装为 Ubuntu 22.04 LTS 或 CentOS Stream 9，再继续部署。
 
 如果服务器开启了腾讯云防火墙，还要在控制台同步放行 `80/443`。
 
@@ -49,11 +69,19 @@ git clone https://github.com/alexclownfish/cyclewhere.git /opt/fengji
 cd /opt/fengji
 ```
 
-正式部署建议使用 tag 或固定提交，而不是直接跟随 `main`：
+如果你已经在 `/opt/fengji` 中并且之前切到了旧提交，先回到最新 `main`：
 
 ```bash
-git checkout 79a6fd8
+cd /opt/fengji
+git fetch origin
+git switch main
+git pull --ff-only origin main
+git log -1 --oneline
 ```
+
+输出应为 `cbd17e6 docs: add Tencent Cloud deployment runbook` 或更新的提交。不要使用早期的 `79a6fd8`，那个提交还没有 `deploy/` 目录。
+
+正式部署仍建议使用已验收的 tag 或固定提交；确认版本后可执行 `git checkout <commit>`，但必须确认该提交包含 `deploy/docker-compose.prod.yml`。
 
 ## 4. 创建生产密钥
 
