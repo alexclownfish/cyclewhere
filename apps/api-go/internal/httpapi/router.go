@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,7 +28,17 @@ import (
 const (
 	jsonBodyLimit = 256 * 1024
 	avatarLimit   = 512 * 1024
-	gpxLimit      = 2 * 1024 * 1024
+	// Base64 expands binary data by roughly 4/3. This leaves room for the
+	// encoded payload and JSON envelope while decodeAvatarBase64 enforces the
+	// 512KB decoded-image limit.
+	avatarBase64BodyLimit = 768 * 1024
+	gpxLimit              = 2 * 1024 * 1024
+)
+
+var (
+	errAvatarMissing  = errors.New("avatar payload is missing")
+	errAvatarInvalid  = errors.New("avatar payload is invalid")
+	errAvatarTooLarge = errors.New("avatar payload is too large")
 )
 
 var avatarFileName = regexp.MustCompile(`(?i)^[0-9a-f-]{36}\.(jpg|png|webp)$`)
@@ -88,6 +99,7 @@ func NewRouter(deps Dependencies) (*gin.Engine, error) {
 	protected.GET("/me/profile", api.getProfile)
 	protected.PUT("/me/profile", api.updateProfile)
 	protected.POST("/me/avatar", api.uploadAvatar)
+	protected.POST("/me/avatar/base64", api.uploadAvatarBase64)
 	protected.GET("/me/events", api.listOwnedEvents)
 	protected.GET("/me/registrations", api.listMyRegistrations)
 	protected.POST("/events", api.createEvent)
@@ -117,7 +129,7 @@ func (a *API) recovery() gin.HandlerFunc {
 func (a *API) limitRequestBody() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		upload := path == "/api/v1/me/avatar" || path == "/api/v1/routes/import/gpx"
+		upload := path == "/api/v1/me/avatar" || path == "/api/v1/me/avatar/base64" || path == "/api/v1/routes/import/gpx"
 		if !upload && c.Request.Body != nil {
 			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, jsonBodyLimit)
 		}
@@ -374,6 +386,138 @@ func (a *API) uploadAvatar(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, data(gin.H{"profile": profileResponse(&updated)}))
+}
+
+// uploadAvatarBase64 is intended for wx.request. wx.uploadFile requires a
+// separately configured uploadFile domain, while request domains are already
+// available to the mini program. The payload accepts either raw base64 or a
+// data URL such as data:image/jpeg;base64,... .
+func (a *API) uploadAvatarBase64(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, avatarBase64BodyLimit)
+	var input struct {
+		Data string `json:"data"`
+	}
+	if err := decodeJSON(c, &input, true); err != nil {
+		writeDecodeError(c, err)
+		return
+	}
+	buffer, err := decodeAvatarBase64(input.Data)
+	if errors.Is(err, errAvatarMissing) {
+		writeError(c, domain.NewError("AVATAR_MISSING", "请选择微信头像", 400))
+		return
+	}
+	if errors.Is(err, errAvatarTooLarge) {
+		writeError(c, domain.NewError("AVATAR_TOO_LARGE", "头像文件不能超过 512KB", 413))
+		return
+	}
+	if err != nil {
+		writeError(c, domain.NewError("AVATAR_INVALID", "头像仅支持 JPEG、PNG 或 WebP 图片", 400))
+		return
+	}
+	extension, _ := detectImage(buffer)
+	if extension == "" {
+		writeError(c, domain.NewError("AVATAR_INVALID", "头像仅支持 JPEG、PNG 或 WebP 图片", 400))
+		return
+	}
+	if err := a.storeAvatarBytes(c, buffer, extension); err != nil {
+		writeError(c, err)
+	}
+}
+
+func decodeAvatarBase64(raw string) ([]byte, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil, errAvatarMissing
+	}
+	if strings.HasPrefix(strings.ToLower(value), "data:") {
+		separator := strings.IndexByte(value, ',')
+		if separator < 0 || !strings.Contains(strings.ToLower(value[:separator]), ";base64") {
+			return nil, errAvatarInvalid
+		}
+		value = strings.TrimSpace(value[separator+1:])
+	}
+	if value == "" {
+		return nil, errAvatarMissing
+	}
+	if len(value) > base64.StdEncoding.EncodedLen(avatarLimit)+4 {
+		return nil, errAvatarTooLarge
+	}
+	decoded, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		decoded, err = base64.RawStdEncoding.DecodeString(value)
+	}
+	if err != nil {
+		return nil, errAvatarInvalid
+	}
+	if len(decoded) == 0 {
+		return nil, errAvatarMissing
+	}
+	if len(decoded) > avatarLimit {
+		return nil, errAvatarTooLarge
+	}
+	return decoded, nil
+}
+
+func (a *API) storeAvatarBytes(c *gin.Context, buffer []byte, extension string) error {
+	if err := os.MkdirAll(a.avatarDir, 0o755); err != nil {
+		return err
+	}
+	name := userID(c) + "." + extension
+	finalPath := filepath.Join(a.avatarDir, name)
+	temporary, err := os.CreateTemp(a.avatarDir, name+".*.tmp")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if _, err = temporary.Write(buffer); err == nil {
+		err = temporary.Sync()
+	}
+	if closeErr := temporary.Close(); err == nil {
+		err = closeErr
+	}
+	if err == nil {
+		err = os.Rename(temporaryPath, finalPath)
+	}
+	if err != nil {
+		_ = os.Remove(finalPath)
+		err = os.Rename(temporaryPath, finalPath)
+	}
+	if err != nil {
+		return err
+	}
+	for _, other := range []string{"jpg", "png", "webp"} {
+		if other != extension {
+			_ = os.Remove(filepath.Join(a.avatarDir, userID(c)+"."+other))
+		}
+	}
+	host := firstForwarded(c.GetHeader("X-Forwarded-Host"))
+	if host == "" {
+		host = firstForwarded(c.Request.Host)
+	}
+	if host == "" {
+		return domain.NewError("PUBLIC_HOST_MISSING", "服务器公开域名配置缺失", 500)
+	}
+	protocol := firstForwarded(c.GetHeader("X-Forwarded-Proto"))
+	if protocol == "" {
+		protocol = "https"
+	}
+	avatarURL := fmt.Sprintf("%s://%s/api/v1/avatars/%s?v=%d", protocol, host, name, a.now().UnixMilli())
+	profile, err := a.repository.GetUserProfile(c.Request.Context(), userID(c))
+	if err != nil {
+		return err
+	}
+	if profile == nil {
+		return errors.New("User profile must be created before uploading an avatar")
+	}
+	profile.AvatarURL = &avatarURL
+	profile.UpdatedAt = a.now().UTC()
+	updated, err := a.repository.UpsertUserProfile(c.Request.Context(), *profile)
+	if err != nil {
+		return err
+	}
+	c.JSON(http.StatusCreated, data(gin.H{"profile": profileResponse(&updated)}))
+	return nil
 }
 
 func (a *API) getAvatar(c *gin.Context) {

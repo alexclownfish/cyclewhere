@@ -2,6 +2,8 @@ FROM golang:1.25-alpine AS build
 
 WORKDIR /src/apps/api-go
 COPY apps/api-go/go.mod apps/api-go/go.sum ./
+ARG GOPROXY=https://proxy.golang.org,direct
+ENV GOPROXY=${GOPROXY}
 RUN go mod download
 COPY apps/api-go/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/server \
@@ -9,7 +11,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./c
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates tzdata \
+ARG APK_MIRROR=mirrors.aliyun.com
+RUN sed -i "s/dl-cdn.alpinelinux.org/${APK_MIRROR}/g" /etc/apk/repositories \
+    && apk add --no-cache ca-certificates tzdata \
     && addgroup -S -g 10001 fengji \
     && adduser -S -D -H -u 10001 -G fengji fengji \
     && mkdir -p /app/data/avatars \

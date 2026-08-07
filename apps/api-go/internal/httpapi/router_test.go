@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
@@ -447,6 +448,63 @@ func TestAvatarUploadUsesMagicBytesAndCreatedStatus(t *testing.T) {
 	fetched := perform(router, http.MethodGet, "/api/v1/avatars/"+userID+".jpg", "", "")
 	if fetched.Code != http.StatusOK || fetched.Header().Get("Content-Type") != "image/jpeg" || !bytes.Equal(fetched.Body.Bytes(), jpeg) {
 		t.Fatalf("fetched avatar: status=%d content-type=%q body=%x", fetched.Code, fetched.Header().Get("Content-Type"), fetched.Body.Bytes())
+	}
+}
+
+func TestAvatarBase64UploadUsesRequestDomain(t *testing.T) {
+	const userID = "0f2f4ec8-3d61-52e9-85d8-e5f770c7cbed"
+	nickname := "Rider"
+	repository := &fakeRepository{profile: &domain.UserProfile{ID: userID, Nickname: &nickname, UpdatedAt: contractNow}}
+	router, issuer, _, _ := newContractRouter(t, repository, t.TempDir())
+	jpeg := []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F'}
+	body := `{"data":"data:image/jpeg;base64,` + base64.StdEncoding.EncodeToString(jpeg) + `"}`
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/me/avatar/base64", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", authHeader(t, issuer, userID))
+	request.Host = "api.example.test"
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("base64 upload status = %d, body = %s", response.Code, response.Body.String())
+	}
+	profile := nestedObject(t, nestedObject(t, decodeObject(t, response)["data"], "data")["profile"], "data.profile")
+	wantURL := "https://api.example.test/api/v1/avatars/" + userID + ".jpg?v=1786097472123"
+	if profile["avatarUrl"] != wantURL {
+		t.Fatalf("avatarUrl = %v, want %s", profile["avatarUrl"], wantURL)
+	}
+	fetched := perform(router, http.MethodGet, "/api/v1/avatars/"+userID+".jpg", "", "")
+	if fetched.Code != http.StatusOK || fetched.Header().Get("Content-Type") != "image/jpeg" || !bytes.Equal(fetched.Body.Bytes(), jpeg) {
+		t.Fatalf("fetched base64 avatar: status=%d content-type=%q body=%x", fetched.Code, fetched.Header().Get("Content-Type"), fetched.Body.Bytes())
+	}
+}
+
+func TestAvatarBase64UploadValidatesPayloadSizeAndEncoding(t *testing.T) {
+	const userID = "0f2f4ec8-3d61-52e9-85d8-e5f770c7cbed"
+	nickname := "Rider"
+	repository := &fakeRepository{profile: &domain.UserProfile{ID: userID, Nickname: &nickname, UpdatedAt: contractNow}}
+	router, issuer, _, _ := newContractRouter(t, repository, t.TempDir())
+	authorization := authHeader(t, issuer, userID)
+	post := func(value string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/me/avatar/base64", strings.NewReader(`{"data":`+value+`}`))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Authorization", authorization)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		return response
+	}
+	missing := post(`""`)
+	if missing.Code != http.StatusBadRequest || nestedObject(t, decodeObject(t, missing)["error"], "error")["code"] != "AVATAR_MISSING" {
+		t.Fatalf("missing payload: status=%d body=%s", missing.Code, missing.Body.String())
+	}
+	invalid := post(`"data:image/jpeg,not-base64"`)
+	if invalid.Code != http.StatusBadRequest || nestedObject(t, decodeObject(t, invalid)["error"], "error")["code"] != "AVATAR_INVALID" {
+		t.Fatalf("invalid payload: status=%d body=%s", invalid.Code, invalid.Body.String())
+	}
+	oversized := make([]byte, avatarLimit+1)
+	oversized[0], oversized[1], oversized[2] = 0xff, 0xd8, 0xff
+	tooLarge := post(`"` + base64.StdEncoding.EncodeToString(oversized) + `"`)
+	if tooLarge.Code != http.StatusRequestEntityTooLarge || nestedObject(t, decodeObject(t, tooLarge)["error"], "error")["code"] != "AVATAR_TOO_LARGE" {
+		t.Fatalf("oversized payload: status=%d body=%s", tooLarge.Code, tooLarge.Body.String())
 	}
 }
 

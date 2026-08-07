@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { createAuthenticationProvider, createRealApi, type RequestSpec, type Transport } from '../services/api.ts';
+import { ApiError, createAuthenticationProvider, createRealApi, normalizeRequestSpec, type RequestSpec, type Transport } from '../services/api.ts';
 import type { BackendEvent, BackendRegistrationResult, BackendRoadbook } from '../services/api-contract.ts';
 import type { PublishEventInput, RegistrationInput } from '../types/domain.ts';
 
@@ -97,6 +97,39 @@ test('authentication provider exchanges one WeChat code and reuses the stored be
   assert.equal((values.get('demo_account') as { id: string }).id, 'user-1');
 });
 
+test('public event detail remains available when login is unavailable', async () => {
+  const calls: string[] = [];
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    calls.push(spec.url);
+    if (spec.url === '/api/v1/events/event-1') return backendEvent as T;
+    if (spec.url === '/api/v1/routes/route-1') return roadbook as T;
+    throw new Error(`unexpected ${spec.url}`);
+  };
+  const unavailableAuth = async (): Promise<Record<string, string>> => { throw new Error('login unavailable'); };
+  const event = await createRealApi(transport, 'user-1', unavailableAuth).getEvent('event-1');
+  assert.equal(event.id, 'event-1');
+  assert.deepEqual(calls, ['/api/v1/events/event-1', '/api/v1/routes/route-1']);
+});
+
+test('protected request refreshes a rejected bearer token once', async () => {
+  const refreshFlags: Array<boolean | undefined> = [];
+  let requestCount = 0;
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    requestCount += 1;
+    if (requestCount === 1) throw new ApiError('登录已过期', 401, 'UNAUTHORIZED');
+    assert.equal(spec.header?.Authorization, 'Bearer refreshed-token');
+    return { items: [] } as T;
+  };
+  const authProvider = async (forceRefresh?: boolean) => {
+    refreshFlags.push(forceRefresh);
+    return { Authorization: `Bearer ${forceRefresh ? 'refreshed-token' : 'stale-token'}` };
+  };
+  const records = await createRealApi(transport, 'user-1', authProvider).getMyRegistrationRecords();
+  assert.deepEqual(records, []);
+  assert.deepEqual(refreshFlags, [undefined, true]);
+  assert.equal(requestCount, 2);
+});
+
 test('my registrations uses the JWT aggregate endpoint and keeps historical event data', async () => {
   const cancelledRegistration = {
     id: 'reg-history', eventId: backendEvent.id, userId: 'user-1', status: 'cancelled' as const,
@@ -136,4 +169,87 @@ test('publish adapter creates a draft then calls publish endpoint', async () => 
   ]);
   assert.equal((calls[1].data as { summary: string }).summary, input.description);
   assert.equal(event.status, 'published');
+});
+
+test('publish endpoint normalizes an empty JSON body', () => {
+  assert.deepEqual(normalizeRequestSpec({ url: '/api/v1/events/event-1/publish', method: 'POST' }).data, {});
+  assert.equal((normalizeRequestSpec({ url: '/api/v1/events', method: 'POST', data: { title: 'x' } }).data as { title: string }).title, 'x');
+});
+
+test('event edit uses the WeChat-compatible PUT endpoint with organizer authentication', async () => {
+  const calls: RequestSpec[] = [];
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    calls.push(spec);
+    if (spec.url === '/api/v1/routes/route-1') return roadbook as T;
+    if (spec.url === '/api/v1/events/event-1') return { ...backendEvent, title: '更新后的活动' } as T;
+    throw new Error(`unexpected ${spec.url}`);
+  };
+  const input: PublishEventInput = {
+    title: '更新后的活动', date: '2026-09-13', time: '07:00', meetingPoint: '杭州龙井路停车场入口',
+    routeId: 'route-1', capacity: 20, speedRange: '24-29 km/h', description: '遵守交通规则，路线可能因天气调整。',
+    requirements: { equipment: ['头盔'], recentDistanceKm: 60, recentElevationM: 800, bikeTypes: ['公路车'], disciplines: ['听从领队指挥'] },
+  };
+  const updated = await createRealApi(transport, 'organizer-demo', auth).updateEvent('event-1', input);
+  assert.equal(updated.title, '更新后的活动');
+  assert.deepEqual(calls.map((item) => `${item.method} ${item.url}`), [
+    'GET /api/v1/routes/route-1', 'PUT /api/v1/events/event-1',
+  ]);
+  assert.equal(calls[1].header?.Authorization, 'Bearer verified-test-token');
+});
+
+test('profile APIs read and save the authenticated WeChat profile', async () => {
+  const profile = { id: 'user-1', nickname: '骑行小明', avatarUrl: 'https://wx.qlogo.cn/avatar.png', city: '杭州' };
+  const calls: RequestSpec[] = [];
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    calls.push(spec);
+    return { profile } as T;
+  };
+  const api = createRealApi(transport, 'user-1', auth);
+  assert.deepEqual(await api.getProfile(), profile);
+  assert.deepEqual(await api.updateProfile({ nickname: profile.nickname, avatarUrl: profile.avatarUrl, city: profile.city }), profile);
+  assert.deepEqual(calls.map((item) => `${item.method} ${item.url}`), [
+    'GET /api/v1/me/profile', 'PUT /api/v1/me/profile',
+  ]);
+  assert.ok(calls.every((item) => item.header?.Authorization === 'Bearer verified-test-token'));
+});
+
+test('supported avatar and nickname registration persists profile then uploads the selected avatar', async () => {
+  const originalWx = (globalThis as { wx?: unknown }).wx;
+  let avatarRequest: any;
+  (globalThis as any).wx = {
+    getStorageSync: () => undefined,
+    setStorageSync: () => undefined,
+    getFileSystemManager: () => ({
+      readFile: ({ success }: { success: (result: unknown) => void }) => success({ data: 'ZmFrZS1hdmF0YXI=' }),
+    }),
+    request: (request: unknown) => {
+      avatarRequest = request;
+      (request as { success: (result: unknown) => void }).success({
+        statusCode: 201,
+        data: { data: { profile: { id: 'user-1', nickname: '骑行小明', avatarUrl: 'https://cyclewhereapi.alexcld.com/api/v1/avatars/user-1.jpg', city: null } } },
+      });
+    },
+  };
+  const calls: RequestSpec[] = [];
+  const profile = { id: 'user-1', nickname: '骑行小明', avatarUrl: 'https://cyclewhereapi.alexcld.com/api/v1/avatars/user-1.jpg', city: null };
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    calls.push(spec);
+    return { profile } as T;
+  };
+  try {
+    const result = await createRealApi(transport, 'user-1', auth).registerProfile('骑行小明', 'wxfile://selected-avatar.jpg', true);
+    assert.deepEqual(result, profile);
+    assert.deepEqual(calls.map((item) => `${item.method} ${item.url}`), ['PUT /api/v1/me/profile']);
+    assert.deepEqual(calls[0].data, {
+      nickname: '骑行小明', avatarUrl: null, gender: null,
+      country: null, province: null, city: null,
+    });
+    assert.equal(avatarRequest.url, 'https://cyclewhereapi.alexcld.com/api/v1/me/avatar/base64');
+    assert.equal(avatarRequest.method, 'POST');
+    assert.equal(avatarRequest.data.data, 'ZmFrZS1hdmF0YXI=');
+    assert.equal(avatarRequest.header.Authorization, 'Bearer verified-test-token');
+  } finally {
+    if (originalWx === undefined) delete (globalThis as { wx?: unknown }).wx;
+    else (globalThis as { wx?: unknown }).wx = originalWx;
+  }
 });

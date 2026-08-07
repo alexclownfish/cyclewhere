@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+**/node_modules
+apps/api/dist
+apps/mini-program/node_modules
+assets
+docs
+tests
+*.log
+deploy/*.tar.gz
