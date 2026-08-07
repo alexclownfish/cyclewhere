@@ -43,7 +43,7 @@ func (s *Catalog) ImportGPX(ctx context.Context, ownerID string, source []byte, 
 	if err != nil {
 		return domain.Roadbook{}, err
 	}
-	if parsed.DistanceKM <= 0 || parsed.DistanceKM > 1000 || parsed.ElevationGainM > 30000 {
+	if parsed.DistanceKM <= 0 || parsed.DistanceKM > 1000 || parsed.ElevationGainM > 30000 || parsed.MaxGradient > 100 {
 		return domain.Roadbook{}, domain.NewError("GPX_INVALID", "GPX 轨迹距离或爬升超出支持范围", 400)
 	}
 	name := strings.TrimSpace(metadata.Name)

@@ -195,3 +195,17 @@ func TestImportGPXRejectsZeroDistanceBeforeRepositoryWrite(t *testing.T) {
 		t.Fatal("invalid GPX reached the repository")
 	}
 }
+
+func TestImportGPXRejectsUnsupportedGradientBeforeRepositoryWrite(t *testing.T) {
+	repository := newTestRepository()
+	catalog := NewCatalog(repository, func() time.Time { return fixedNow })
+	xml := []byte(`<gpx><trk><trkseg><trkpt lat="30" lon="120"><ele>0</ele></trkpt><trkpt lat="30.0001" lon="120"><ele>20</ele></trkpt></trkseg></trk></gpx>`)
+	_, err := catalog.ImportGPX(context.Background(), "owner-1", xml, GPXMetadata{})
+	var domainError *domain.Error
+	if !errors.As(err, &domainError) || domainError.Code != "GPX_INVALID" || domainError.StatusCode != 400 {
+		t.Fatalf("expected GPX_INVALID 400, got %v", err)
+	}
+	if len(repository.roadbooks) != 0 {
+		t.Fatal("invalid GPX reached the repository")
+	}
+}

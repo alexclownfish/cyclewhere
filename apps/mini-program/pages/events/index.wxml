@@ -1,10 +1,12 @@
 <view class="page">
   <view class="hero">
-    <view class="hero-kicker">下一场计划</view>
+    <view class="hero-top"><view class="hero-kicker"><text class="brand-pulse"></text>下一场计划</view><view class="hero-pill">本周精选</view></view>
     <view class="hero-title">把周末留给公路</view>
     <view class="hero-copy">明确路线、能力门槛与队伍纪律，放心出发。</view>
+    <view class="hero-rail"><text></text><text></text><text></text><text></text></view>
   </view>
   <view class="search-wrap">
+    <text class="search-icon">⌕</text>
     <input class="search" placeholder="搜索活动、路线或集合点" value="{{keyword}}" bindinput="onKeyword" confirm-type="search" />
   </view>
   <scroll-view class="filters" scroll-x enhanced show-scrollbar="{{false}}">
@@ -22,11 +24,11 @@
   </view>
   <view wx:else class="content event-list">
     <view wx:for="{{visibleEvents}}" wx:key="id" class="card event-card" data-id="{{item.id}}" bindtap="openEvent">
-      <image class="event-cover" src="{{item.route.cover}}" mode="aspectFill" lazy-load />
+      <view class="cover-wrap"><image class="event-cover" src="{{item.coverUrl || item.route.cover}}" mode="aspectFill" lazy-load /><view class="cover-chip">{{item.route.distanceKm}} km · {{item.route.difficulty}}</view></view>
       <view class="card-body">
         <view class="row-between"><text class="badge {{item.statusTone}}">{{item.statusText}}</text><text class="small">剩余 {{item.remaining}} 位</text></view>
         <view class="title event-title">{{item.title}}</view>
-        <view class="meta">{{item.dateText}}</view><view class="meta">{{item.meetingPoint}}</view>
+        <view class="meta meta-line"><text class="meta-mark"></text>{{item.dateText}}</view><view class="meta meta-line"><text class="meta-mark"></text>{{item.meetingPoint}}</view>
         <view class="metrics">
           <view class="metric"><text class="metric-value">{{item.route.distanceKm}}</text><text class="metric-label">公里</text></view>
           <view class="metric"><text class="metric-value">{{item.route.elevationGainM}}</text><text class="metric-label">爬升米</text></view>

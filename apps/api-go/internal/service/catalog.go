@@ -45,6 +45,7 @@ type EventPatch struct {
 	RouteID               **string           `json:"routeId"`
 	Title                 *string            `json:"title"`
 	Summary               *string            `json:"summary"`
+	CoverURL              **string           `json:"-"`
 	StartAt               *time.Time         `json:"startAt"`
 	RegistrationDeadline  *time.Time         `json:"registrationDeadline"`
 	MeetingPoint          *string            `json:"meetingPoint"`
@@ -264,6 +265,9 @@ func applyEventPatch(event *domain.Event, patch EventPatch) {
 	if patch.Summary != nil {
 		event.Summary = strings.TrimSpace(*patch.Summary)
 	}
+	if patch.CoverURL != nil {
+		event.CoverURL = *patch.CoverURL
+	}
 	if patch.StartAt != nil {
 		event.StartAt = *patch.StartAt
 	}
@@ -341,6 +345,9 @@ func validateEvent(event domain.Event) error {
 	}
 	if length := len([]rune(event.Summary)); length < 10 || length > 1000 {
 		return invalid("summary", "length must be between 10 and 1000")
+	}
+	if event.CoverURL != nil && (len(*event.CoverURL) > 500 || (!strings.HasPrefix(*event.CoverURL, "https://") && !strings.HasPrefix(*event.CoverURL, "http://"))) {
+		return invalid("coverUrl", "must be an HTTP URL with at most 500 characters")
 	}
 	if event.StartAt.IsZero() || event.RegistrationDeadline.IsZero() || !event.RegistrationDeadline.Before(event.StartAt) {
 		return invalid("registrationDeadline", "must be before startAt")

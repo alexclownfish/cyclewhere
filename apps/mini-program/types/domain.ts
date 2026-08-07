@@ -38,6 +38,7 @@ export interface RideRequirements {
 export interface RideEvent {
   id: string;
   title: string;
+  coverUrl?: string | null;
   organizer: string;
   startAt: string;
   registrationDeadline: string;
@@ -85,7 +86,19 @@ export interface PublishEventInput {
   capacity: number;
   speedRange: string;
   description: string;
+  coverFilePath?: string;
+  coverUrl?: string | null;
   requirements: RideRequirements;
+}
+
+export interface UserProfile {
+  id: string;
+  nickname: string | null;
+  avatarUrl: string | null;
+  gender?: number | null;
+  country?: string | null;
+  province?: string | null;
+  city?: string | null;
 }
 
 export interface ApiEnvelope<T> {

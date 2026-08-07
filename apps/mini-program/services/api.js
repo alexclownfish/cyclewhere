@@ -185,13 +185,17 @@ function createRealApi(transport, currentUser, authHeaders) {
             const roadbook = await transport({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' });
             const route = (0, api_contract_1.mapRoadbook)(roadbook);
             const draft = await protectedRequest({ url: '/api/v1/events', method: 'POST', data: (0, api_contract_1.toCreateEvent)(input, route) });
+            if (input.coverFilePath)
+                await uploadEventCover(draft.id, input.coverFilePath, await authHeaders());
             const published = await protectedRequest({ url: `/api/v1/events/${draft.id}/publish`, method: 'POST' });
             return (0, api_contract_1.mapEvent)(published, route, currentUserId());
         },
         async updateEvent(id, input) {
             const roadbook = await transport({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' });
             const route = (0, api_contract_1.mapRoadbook)(roadbook);
-            const updated = await protectedRequest({ url: `/api/v1/events/${id}`, method: 'PUT', data: (0, api_contract_1.toCreateEvent)(input, route) });
+            let updated = await protectedRequest({ url: `/api/v1/events/${id}`, method: 'PUT', data: (0, api_contract_1.toCreateEvent)(input, route) });
+            if (input.coverFilePath)
+                updated = await uploadEventCover(id, input.coverFilePath, await authHeaders());
             return (0, api_contract_1.mapEvent)(updated, route, currentUserId());
         },
         async getProfile() {
@@ -212,25 +216,39 @@ function createRealApi(transport, currentUser, authHeaders) {
         },
     };
 }
-function uploadGpx(filePath, fileName = 'route.gpx', headers) {
+function readFileText(filePath) {
     return new Promise((resolve, reject) => {
-        wx.uploadFile({
-            url: `${env_1.API_BASE_URL}/api/v1/routes/import/gpx`, filePath, name: 'file', formData: { fileName }, header: headers,
-            success(response) {
-                try {
-                    const body = JSON.parse(response.data);
-                    if (response.statusCode >= 200 && response.statusCode < 300 && body.data)
-                        resolve(body.data);
-                    else
-                        reject(new ApiError('GPX 路书导入失败', response.statusCode, 'GPX_IMPORT_FAILED'));
-                }
-                catch {
-                    reject(new ApiError('GPX 路书响应格式错误', response.statusCode, 'GPX_IMPORT_FAILED'));
-                }
-            },
-            fail: () => reject(new ApiError('GPX 文件上传失败', 0, 'GPX_UPLOAD_FAILED')),
+        wx.getFileSystemManager().readFile({
+            filePath,
+            encoding: 'utf8',
+            success: ({ data }) => typeof data === 'string' && data
+                ? resolve(data)
+                : reject(new ApiError('GPX 文件读取失败', 0, 'GPX_READ_FAILED')),
+            fail: (error) => reject(new ApiError(`GPX 文件读取失败：${error.errMsg}`, 0, 'GPX_READ_FAILED')),
         });
     });
+}
+function uploadGpx(filePath, fileName = 'route.gpx', headers) {
+    return readFileText(filePath).then((gpx) => new Promise((resolve, reject) => wx.request({
+        url: `${env_1.API_BASE_URL}/api/v1/routes/import/gpx`, method: 'POST',
+        data: { gpx, name: fileName.replace(/\.gpx$/i, '') },
+        header: { 'content-type': 'application/json', ...headers },
+        success(response) {
+            try {
+                const body = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+                if (response.statusCode >= 200 && response.statusCode < 300 && body.data)
+                    resolve(body.data);
+                else {
+                    const payload = body;
+                    reject(new ApiError(payload.error?.message || 'GPX 路书导入失败', response.statusCode, payload.error?.code || 'GPX_IMPORT_FAILED'));
+                }
+            }
+            catch {
+                reject(new ApiError('GPX 路书响应格式错误', response.statusCode, 'GPX_IMPORT_FAILED'));
+            }
+        },
+        fail: (error) => reject(new ApiError(`GPX 上传失败：${error.errMsg}`, 0, 'GPX_UPLOAD_FAILED')),
+    })));
 }
 function readFileAsBase64(filePath) {
     return new Promise((resolve, reject) => {
@@ -263,6 +281,27 @@ function uploadAvatarBase64(filePath, headers) {
             }
         },
         fail: (error) => reject(new ApiError(`头像上传失败：${error.errMsg}`, 0, 'AVATAR_UPLOAD_FAILED')),
+    })));
+}
+function uploadEventCover(eventId, filePath, headers) {
+    return readFileAsBase64(filePath).then((data) => new Promise((resolve, reject) => wx.request({
+        url: `${env_1.API_BASE_URL}/api/v1/events/${eventId}/cover/base64`, method: 'POST', data: { data },
+        header: { 'content-type': 'application/json', ...headers },
+        success(response) {
+            try {
+                const body = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+                if (response.statusCode >= 200 && response.statusCode < 300 && body.data)
+                    resolve(body.data);
+                else {
+                    const payload = body;
+                    reject(new ApiError(payload.error?.message || '活动封面上传失败', response.statusCode, payload.error?.code || 'COVER_UPLOAD_FAILED'));
+                }
+            }
+            catch {
+                reject(new ApiError('活动封面响应格式错误', response.statusCode, 'COVER_UPLOAD_FAILED'));
+            }
+        },
+        fail: (error) => reject(new ApiError(`活动封面上传失败：${error.errMsg}`, 0, 'COVER_UPLOAD_FAILED')),
     })));
 }
 const realApi = createRealApi(wxTransport, () => wx.getStorageSync('demo_account')?.id || '', authenticationHeaders);

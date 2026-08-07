@@ -6,7 +6,7 @@ export type BackendEventStatus = 'draft' | 'published' | 'full' | 'completed' | 
 
 export interface BackendPage<T> { items: T[]; nextCursor: string | null; }
 export interface BackendEvent {
-  id: string; organizerId: string; routeId: string | null; title: string; summary: string; startAt: string;
+  id: string; organizerId: string; routeId: string | null; title: string; summary: string; coverUrl?: string | null; startAt: string;
   registrationDeadline: string; meetingPoint: string; difficulty: BackendDifficulty; distanceKm: number;
   elevationGainM: number; speedMinKph: number; speedMaxKph: number; capacity: number; registrationCount: number;
   equipmentRequirements: string[]; abilityRequirements: string[]; safetyNotice: string; status: BackendEventStatus;
@@ -74,7 +74,7 @@ export function fallbackRoute(event: BackendEvent): RideRoute {
 
 export function mapEvent(event: BackendEvent, route: RideRoute | undefined, currentUserId: string): RideEvent {
   return {
-    id: event.id, title: event.title, organizer: event.organizerId, startAt: event.startAt, registrationDeadline: event.registrationDeadline, meetingPoint: event.meetingPoint,
+    id: event.id, title: event.title, coverUrl: event.coverUrl || null, organizer: event.organizerId, startAt: event.startAt, registrationDeadline: event.registrationDeadline, meetingPoint: event.meetingPoint,
     routeId: event.routeId || '', route: route || fallbackRoute(event), capacity: event.capacity,
     registeredCount: event.registrationCount, speedRange: `${event.speedMinKph}-${event.speedMaxKph} km/h`,
     status: event.status === 'draft' ? 'published' : event.status, approvalRequired: false,

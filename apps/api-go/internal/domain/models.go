@@ -27,6 +27,7 @@ type Event struct {
 	RouteID               *string     `json:"routeId"`
 	Title                 string      `json:"title"`
 	Summary               string      `json:"summary"`
+	CoverURL              *string     `json:"coverUrl"`
 	StartAt               time.Time   `json:"startAt"`
 	RegistrationDeadline  time.Time   `json:"registrationDeadline"`
 	MeetingPoint          string      `json:"meetingPoint"`

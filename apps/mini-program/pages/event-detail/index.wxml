@@ -2,14 +2,14 @@
   <view wx:if="{{loading}}" class="loading"><text class="loading-dot"></text>正在加载活动详情</view>
   <view wx:elif="{{error}}" class="empty-state"><text class="empty-icon">!</text><view class="empty-title">活动暂不可用</view><view class="empty-copy">{{error}}</view><button class="button button-plain" bindtap="loadDetail">重试</button></view>
   <block wx:elif="{{event}}">
-    <image class="hero-cover" src="{{event.route.cover}}" mode="aspectFill" />
+    <view class="hero-shell"><image class="hero-cover" src="{{event.coverUrl || event.route.cover}}" mode="aspectFill" /><view class="hero-route-chip">{{event.route.distanceKm}} km · 爬升 {{event.route.elevationGainM}} m</view></view>
     <view class="summary">
       <view class="row-between"><view><text class="badge {{event.status === 'published' ? 'badge-red' : ''}}">{{statusText}}</text><text wx:if="{{event.approvalRequired}}" class="badge">审核制</text></view><text class="small">剩余 {{remaining}} 位</text></view>
       <view class="detail-title">{{event.title}}</view>
-      <view class="organizer"><view class="avatar">北</view><view><view>{{event.organizer}}</view><view class="small">活动组织者</view></view></view>
+      <view class="organizer"><view class="avatar">北</view><view class="organizer-copy"><view>{{event.organizer}}</view><view class="small">活动组织者</view></view><view class="verified-mark">✓</view></view>
     </view>
     <view class="detail-section">
-      <view class="form-title">出发信息</view>
+      <view class="section-kicker">RIDE PLAN</view><view class="form-title">出发信息</view>
       <view class="info-grid"><view class="info"><text class="info-label">时间</text><text>{{dateText}}</text></view><view class="info"><text class="info-label">集合</text><text>{{event.meetingPoint}}</text></view><view class="info"><text class="info-label">巡航</text><text>{{event.speedRange}}</text></view><view class="info"><text class="info-label">规模</text><text>{{event.registeredCount}} / {{event.capacity}} 人</text></view></view>
     </view>
     <view class="detail-section route-entry" bindtap="openRoute">
@@ -18,13 +18,13 @@
       <view class="small route-hint">路线仅供参考，出发前请下载离线轨迹并留意现场路况。</view>
     </view>
     <view class="detail-section">
-      <view class="form-title">装备与能力要求</view>
+      <view class="section-kicker">READINESS</view><view class="form-title">装备与能力要求</view>
       <view class="require-group"><view class="require-label">必备装备</view><view class="tag-wrap"><text wx:for="{{event.requirements.equipment}}" wx:key="*this" class="tag">{{item}}</text></view></view>
       <view class="require-group"><view class="require-label">能力门槛</view><view class="require-copy">近 30 天完成过 {{event.requirements.recentDistanceKm}} km 以上骑行，累计爬升不低于 {{event.requirements.recentElevationM}} m；允许 {{bikeTypesText}}。</view></view>
       <view class="require-group"><view class="require-label">队伍纪律</view><view wx:for="{{event.requirements.disciplines}}" wx:key="*this" class="rule"><text class="rule-mark">✓</text>{{item}}</view></view>
       <view wx:if="{{event.requirements.customNote}}" class="risk"><text class="risk-mark">!</text>{{event.requirements.customNote}}</view>
     </view>
-    <view class="detail-section"><view class="form-title">活动说明</view><view class="description">{{event.description}}</view></view>
+    <view class="detail-section"><view class="section-kicker">ABOUT</view><view class="form-title">活动说明</view><view class="description">{{event.description}}</view></view>
     <view class="sticky-actions">
       <button wx:if="{{registration}}" class="button button-plain cancel" loading="{{cancelling}}" bindtap="cancelRegistration">取消报名</button>
       <button class="button button-primary" disabled="{{!registration && !canRegisterNow}}" bindtap="handlePrimary">{{actionText}}</button>

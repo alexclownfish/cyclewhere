@@ -28,10 +28,12 @@ import (
 const (
 	jsonBodyLimit = 256 * 1024
 	avatarLimit   = 512 * 1024
+	coverLimit    = 2 * 1024 * 1024
 	// Base64 expands binary data by roughly 4/3. This leaves room for the
 	// encoded payload and JSON envelope while decodeAvatarBase64 enforces the
 	// 512KB decoded-image limit.
 	avatarBase64BodyLimit = 768 * 1024
+	coverBase64BodyLimit  = 3 * 1024 * 1024
 	gpxLimit              = 2 * 1024 * 1024
 )
 
@@ -42,6 +44,7 @@ var (
 )
 
 var avatarFileName = regexp.MustCompile(`(?i)^[0-9a-f-]{36}\.(jpg|png|webp)$`)
+var eventCoverFileName = regexp.MustCompile(`(?i)^event-[0-9a-f-]{36}\.(jpg|png|webp)$`)
 
 type Dependencies struct {
 	Repository      domain.Repository
@@ -89,6 +92,7 @@ func NewRouter(deps Dependencies) (*gin.Engine, error) {
 	v1 := router.Group("/api/v1")
 	v1.POST("/auth/wechat/login", api.login)
 	v1.GET("/avatars/:fileName", api.getAvatar)
+	v1.GET("/event-covers/:fileName", api.getEventCover)
 	v1.GET("/events", api.listEvents)
 	v1.GET("/events/:id", api.optionalAuth(), api.getEvent)
 	v1.GET("/routes", api.listRoadbooks)
@@ -103,6 +107,7 @@ func NewRouter(deps Dependencies) (*gin.Engine, error) {
 	protected.GET("/me/events", api.listOwnedEvents)
 	protected.GET("/me/registrations", api.listMyRegistrations)
 	protected.POST("/events", api.createEvent)
+	protected.POST("/events/:id/cover/base64", api.uploadEventCoverBase64)
 	protected.POST("/events/:id/publish", api.publishEvent)
 	protected.PATCH("/events/:id", api.updateEvent)
 	protected.PUT("/events/:id", api.updateEvent)
@@ -129,7 +134,8 @@ func (a *API) recovery() gin.HandlerFunc {
 func (a *API) limitRequestBody() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		upload := path == "/api/v1/me/avatar" || path == "/api/v1/me/avatar/base64" || path == "/api/v1/routes/import/gpx"
+		eventCoverUpload := strings.HasPrefix(path, "/api/v1/events/") && strings.HasSuffix(path, "/cover/base64")
+		upload := path == "/api/v1/me/avatar" || path == "/api/v1/me/avatar/base64" || path == "/api/v1/routes/import/gpx" || eventCoverUpload
 		if !upload && c.Request.Body != nil {
 			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, jsonBodyLimit)
 		}
@@ -401,7 +407,7 @@ func (a *API) uploadAvatarBase64(c *gin.Context) {
 		writeDecodeError(c, err)
 		return
 	}
-	buffer, err := decodeAvatarBase64(input.Data)
+	buffer, err := decodeImageBase64(input.Data, avatarLimit)
 	if errors.Is(err, errAvatarMissing) {
 		writeError(c, domain.NewError("AVATAR_MISSING", "请选择微信头像", 400))
 		return
@@ -424,7 +430,7 @@ func (a *API) uploadAvatarBase64(c *gin.Context) {
 	}
 }
 
-func decodeAvatarBase64(raw string) ([]byte, error) {
+func decodeImageBase64(raw string, limit int) ([]byte, error) {
 	value := strings.TrimSpace(raw)
 	if value == "" {
 		return nil, errAvatarMissing
@@ -439,7 +445,7 @@ func decodeAvatarBase64(raw string) ([]byte, error) {
 	if value == "" {
 		return nil, errAvatarMissing
 	}
-	if len(value) > base64.StdEncoding.EncodedLen(avatarLimit)+4 {
+	if len(value) > base64.StdEncoding.EncodedLen(limit)+4 {
 		return nil, errAvatarTooLarge
 	}
 	decoded, err := base64.StdEncoding.DecodeString(value)
@@ -452,11 +458,13 @@ func decodeAvatarBase64(raw string) ([]byte, error) {
 	if len(decoded) == 0 {
 		return nil, errAvatarMissing
 	}
-	if len(decoded) > avatarLimit {
+	if len(decoded) > limit {
 		return nil, errAvatarTooLarge
 	}
 	return decoded, nil
 }
+
+func decodeAvatarBase64(raw string) ([]byte, error) { return decodeImageBase64(raw, avatarLimit) }
 
 func (a *API) storeAvatarBytes(c *gin.Context, buffer []byte, extension string) error {
 	if err := os.MkdirAll(a.avatarDir, 0o755); err != nil {
@@ -529,6 +537,125 @@ func (a *API) getAvatar(c *gin.Context) {
 	buffer, err := os.ReadFile(filepath.Join(a.avatarDir, name))
 	if errors.Is(err, os.ErrNotExist) {
 		writeError(c, domain.NotFound("头像"))
+		return
+	}
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	_, contentType := detectImage(buffer)
+	c.Header("Cache-Control", "public, max-age=31536000, immutable")
+	c.Data(http.StatusOK, contentType, buffer)
+}
+
+func (a *API) uploadEventCoverBase64(c *gin.Context) {
+	if !validID(c.Param("id")) {
+		writeValidation(c)
+		return
+	}
+	event, err := a.catalog.GetEvent(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	if event.OrganizerID != userID(c) {
+		writeError(c, domain.Forbidden("仅活动组织者可以上传封面"))
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, coverBase64BodyLimit)
+	var input struct {
+		Data string `json:"data"`
+	}
+	if err := decodeJSON(c, &input, true); err != nil {
+		writeDecodeError(c, err)
+		return
+	}
+	buffer, err := decodeImageBase64(input.Data, coverLimit)
+	if errors.Is(err, errAvatarMissing) {
+		writeError(c, domain.NewError("COVER_MISSING", "请选择活动封面", 400))
+		return
+	}
+	if errors.Is(err, errAvatarTooLarge) {
+		writeError(c, domain.NewError("COVER_TOO_LARGE", "活动封面不能超过 2MB", 413))
+		return
+	}
+	if err != nil {
+		writeError(c, domain.NewError("COVER_INVALID", "活动封面仅支持 JPEG、PNG 或 WebP 图片", 400))
+		return
+	}
+	extension, _ := detectImage(buffer)
+	if extension == "" {
+		writeError(c, domain.NewError("COVER_INVALID", "活动封面仅支持 JPEG、PNG 或 WebP 图片", 400))
+		return
+	}
+	if err := os.MkdirAll(a.avatarDir, 0o755); err != nil {
+		writeError(c, err)
+		return
+	}
+	name := "event-" + event.ID + "." + extension
+	finalPath := filepath.Join(a.avatarDir, name)
+	temporary, err := os.CreateTemp(a.avatarDir, name+".*.tmp")
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if _, err = temporary.Write(buffer); err == nil {
+		err = temporary.Sync()
+	}
+	if closeErr := temporary.Close(); err == nil {
+		err = closeErr
+	}
+	if err == nil {
+		err = os.Rename(temporaryPath, finalPath)
+	}
+	if err != nil {
+		_ = os.Remove(finalPath)
+		err = os.Rename(temporaryPath, finalPath)
+	}
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	host := firstForwarded(c.GetHeader("X-Forwarded-Host"))
+	if host == "" {
+		host = firstForwarded(c.Request.Host)
+	}
+	if host == "" {
+		writeError(c, domain.NewError("PUBLIC_HOST_MISSING", "服务器公开域名配置缺失", 500))
+		return
+	}
+	protocol := firstForwarded(c.GetHeader("X-Forwarded-Proto"))
+	if protocol == "" {
+		protocol = "https"
+	}
+	coverURL := fmt.Sprintf("%s://%s/api/v1/event-covers/%s?v=%d", protocol, host, name, a.now().UnixMilli())
+	coverURLValue := coverURL
+	coverURLPtr := &coverURLValue
+	updated, err := a.catalog.UpdateEvent(c.Request.Context(), event.ID, userID(c), service.EventPatch{CoverURL: &coverURLPtr})
+	if err != nil {
+		_ = os.Remove(finalPath)
+		writeError(c, err)
+		return
+	}
+	for _, other := range []string{"jpg", "png", "webp"} {
+		if other != extension {
+			_ = os.Remove(filepath.Join(a.avatarDir, "event-"+event.ID+"."+other))
+		}
+	}
+	c.JSON(http.StatusCreated, data(eventResponse(updated)))
+}
+
+func (a *API) getEventCover(c *gin.Context) {
+	name := c.Param("fileName")
+	if !eventCoverFileName.MatchString(name) {
+		writeError(c, domain.NotFound("活动封面"))
+		return
+	}
+	buffer, err := os.ReadFile(filepath.Join(a.avatarDir, name))
+	if errors.Is(err, os.ErrNotExist) {
+		writeError(c, domain.NotFound("活动封面"))
 		return
 	}
 	if err != nil {
@@ -745,6 +872,7 @@ func (a *API) importGPX(c *gin.Context) {
 		}
 		metadata = metadataFromForm(c.Request.MultipartForm)
 	} else if strings.HasPrefix(contentType, "application/json") {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, gpxLimit+128*1024)
 		var input struct {
 			GPX         string            `json:"gpx"`
 			Name        string            `json:"name"`

@@ -22,7 +22,7 @@ func eventResponse(event domain.Event) gin.H {
 	}
 	return gin.H{
 		"id": event.ID, "organizerId": event.OrganizerID, "routeId": event.RouteID,
-		"title": event.Title, "summary": event.Summary, "startAt": isoTime(event.StartAt),
+		"title": event.Title, "summary": event.Summary, "coverUrl": event.CoverURL, "startAt": isoTime(event.StartAt),
 		"registrationDeadline": isoTime(event.RegistrationDeadline), "meetingPoint": event.MeetingPoint,
 		"difficulty": event.Difficulty, "distanceKm": event.DistanceKM, "elevationGainM": event.ElevationGainM,
 		"speedMinKph": event.SpeedMinKPH, "speedMaxKph": event.SpeedMaxKPH, "capacity": event.Capacity,
