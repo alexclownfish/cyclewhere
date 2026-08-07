@@ -1,0 +1,43 @@
+package domain
+
+import (
+	"context"
+	"time"
+)
+
+type EventListQuery struct {
+	Status     *EventStatus
+	Difficulty *Difficulty
+	Cursor     *string
+	Limit      int
+}
+
+type RegisterCommand struct {
+	EventID                   string
+	UserID                    string
+	IdempotencyKey            string
+	AbilityConfirmed          bool
+	EquipmentConfirmed        bool
+	WaiverVersion             string
+	PhoneEncrypted            string
+	EmergencyContactEncrypted string
+	BikeType                  string
+	Now                       time.Time
+}
+
+type Repository interface {
+	GetUserProfile(context.Context, string) (*UserProfile, error)
+	UpsertUserProfile(context.Context, UserProfile) (UserProfile, error)
+	CreateEvent(context.Context, Event) (Event, error)
+	UpdateEvent(context.Context, Event) (Event, error)
+	GetEvent(context.Context, string) (*Event, error)
+	ListEvents(context.Context, EventListQuery) (Page[Event], error)
+	ListEventsByOrganizer(context.Context, string) ([]Event, error)
+	CreateRoadbook(context.Context, Roadbook) (Roadbook, error)
+	GetRoadbook(context.Context, string) (*Roadbook, error)
+	ListRoadbooks(context.Context, int, *string) (Page[Roadbook], error)
+	RegisterAtomically(context.Context, RegisterCommand) (RegistrationResult, error)
+	CancelRegistrationAtomically(context.Context, string, string, time.Time) (RegistrationResult, error)
+	GetRegistration(context.Context, string, string) (*Registration, error)
+	ListRegistrationsByUser(context.Context, string) ([]UserRegistration, error)
+}

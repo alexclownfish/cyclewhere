@@ -3,8 +3,8 @@
 本文用于把当前项目部署到一台腾讯云 Linux 服务器，目标是先完成可用的微信小程序 MVP 上线链路：
 
 ```text
-微信小程序 -> HTTPS 域名 -> Caddy -> NestJS API -> PostgreSQL/PostGIS
-                                             -> Redis（后续共享限流，可选）
+微信小程序 -> HTTPS 域名 -> Caddy -> Go/Gin API -> PostgreSQL/PostGIS
+                                            -> Redis（后续共享限流，可选）
 ```
 
 这是一台服务器的过渡方案，适合内测和早期运营，不具备多可用区和自动故障切换能力。用户量稳定后，优先把 PostgreSQL/PostGIS 和 Redis 迁移到腾讯云托管服务，再把 API 扩展为两台服务器。
@@ -94,6 +94,8 @@ openssl rand -hex 32
 
 编辑 `deploy/.env.production`，替换 `POSTGRES_PASSWORD`、`REDIS_PASSWORD`、`JWT_SECRET`、`FIELD_ENCRYPTION_KEY`、`WECHAT_APP_ID` 和 `WECHAT_APP_SECRET`。
 
+`WECHAT_APP_ID` 必须与 `apps/mini-program/project.config.json` 中的正式小程序 AppID 一致；`WECHAT_APP_SECRET` 必须从微信公众平台的“开发管理 -> 开发设置 -> 开发者 ID”获取。不能用 `openssl rand` 生成值代替 AppSecret。
+
 `FIELD_ENCRYPTION_KEY` 一旦用于保存真实手机号和紧急联系人，后续不能随意更换，否则旧数据无法解密。密钥不要提交 Git 或写入 Dockerfile。
 
 ## 5. 配置 HTTPS 域名
@@ -120,7 +122,13 @@ docker compose --env-file deploy/.env.production \
   -f deploy/docker-compose.prod.yml up -d --build
 ```
 
-API 容器启动时会先执行 `npm run migrate:prod`。迁移由数据库中的 `schema_migrations` 表保证幂等，完成后才启动 API。
+API 容器启动时会先执行 Go 迁移器 `./migrate`。迁移使用 PostgreSQL advisory lock 和 `schema_migrations` 表保证并发安全及幂等，完成后才启动 Gin API。配置缺少数据库、正式 AppID/AppSecret、JWT 密钥或字段加密密钥时，进程会拒绝启动并在日志中给出明确错误。
+
+首次从旧 Node 容器切换到非 root Go 容器前，需迁移头像卷权限一次：
+
+```bash
+docker run --rm -v deploy_fengji-avatars:/data --entrypoint chown caddy:2-alpine -R 10001:10001 /data
+```
 
 当前后端尚未使用 Redis，共享限流仍属于生产增强项，因此 Redis 被放在 Compose 的 `cache` profile 中，默认不会启动，也不会阻断 API。以后接入 Redis 后可增加 `--profile cache` 启动。
 
@@ -155,10 +163,13 @@ export const USE_MOCK = false;
 
 ## 8. 日常更新
 
-先在本地执行：
+先在本地执行 Node/小程序门禁和 Go 门禁：
 
 ```powershell
 npm run verify
+cd apps/api-go
+go test -count=1 ./...
+go vet ./...
 ```
 
 服务器更新：
@@ -236,4 +247,4 @@ docker compose --env-file deploy/.env.production \
 - [ ] 已执行一次数据库备份并验证备份文件可读。
 - [ ] 已保留上一版本提交号，具备回滚路径。
 
-当前项目仍有生产边界：本单机方案没有高可用，登录限流还不是共享 Redis 实现，活动编辑/取消通知、GPX 导入和运营后台也不在当前核心切片内。上线前请同步参考 [QA 报告](../tests/qa-review-report.md)。
+当前项目仍有生产边界：本单机方案没有高可用，登录限流还不是共享 Redis 实现，活动取消通知和运营后台也不在当前核心切片内。当前版本已包含微信资料同步、活动编辑和 GPX/iGPSPORT 导出文件导入；升级后应确认迁移 `005_user_profiles.sql` 已执行，并用真机验证这三个入口。上线前请同步参考 [QA 报告](../tests/qa-review-report.md)。

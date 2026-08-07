@@ -1,0 +1,12 @@
+FROM caddy:2-alpine
+
+WORKDIR /app
+COPY deploy/go-api-bin/api deploy/go-api-bin/migrate ./
+COPY apps/api/migrations ./migrations
+USER root
+RUN chmod 0555 /app/api /app/migrate \
+    && mkdir -p /app/data/avatars \
+    && chown -R 10001:10001 /app
+USER 10001:10001
+EXPOSE 3000
+CMD ["./api"]

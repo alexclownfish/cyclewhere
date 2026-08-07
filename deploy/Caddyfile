@@ -1,4 +1,4 @@
-api.example.com {
+cyclewhereapi.alexcld.com {
   encode gzip
   reverse_proxy api:3000
 }

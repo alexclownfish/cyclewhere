@@ -35,23 +35,27 @@ services:
       start_period: 10s
 
   api:
+    image: deploy_api:latest
     build:
-      context: ../apps/api
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/api-go/Dockerfile
     restart: unless-stopped
     env_file:
       - ./.env.production
     environment:
-      NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} # security-scan: allow - runtime-only Compose interpolation
+      AVATAR_UPLOAD_DIR: /app/data/avatars
+      MIGRATIONS_DIR: /app/migrations
+    volumes:
+      - fengji-avatars:/app/data/avatars
     depends_on:
       postgres:
         condition: service_healthy
     expose:
       - "3000"
-    command: ["sh", "-c", "npm run migrate:prod && npm start"]
+    command: ["sh", "-c", "./migrate && exec ./api"]
 
   caddy:
     image: caddy:2-alpine
@@ -71,3 +75,4 @@ volumes:
   fengji-redis:
   caddy-data:
   caddy-config:
+  fengji-avatars:

@@ -1,0 +1,592 @@
+package store
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	"cyclewhere/api-go/internal/domain"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+const eventColumns = `
+  id, organizer_id, roadbook_id, title, summary, start_at, registration_deadline,
+  meeting_point, difficulty, distance_km, elevation_gain_m, speed_min_kph,
+  speed_max_kph, capacity, registration_count, equipment_requirements,
+  ability_requirements, safety_notice, status, created_at, updated_at, version`
+
+const roadbookColumns = `
+  id, owner_id, name, description, distance_km, elevation_gain_m,
+  estimated_minutes, difficulty, region, coordinate_system,
+  ST_AsGeoJSON(track::geometry)::jsonb, elevation_profile, max_gradient,
+  created_at, updated_at`
+
+const registrationColumns = `
+  id, event_id, user_id, status, ability_confirmed, equipment_confirmed,
+  waiver_version, waiver_accepted_at, created_at, updated_at, cancelled_at`
+
+type Postgres struct{ pool *pgxpool.Pool }
+
+func NewPostgres(pool *pgxpool.Pool) *Postgres { return &Postgres{pool: pool} }
+
+func Open(ctx context.Context, databaseURL string, maxConnections int32) (*Postgres, error) {
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse database config: %w", err)
+	}
+	if maxConnections > 0 {
+		config.MaxConns = maxConnections
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+	return NewPostgres(pool), nil
+}
+
+func (p *Postgres) Close() { p.pool.Close() }
+
+func (p *Postgres) GetUserProfile(ctx context.Context, userID string) (*domain.UserProfile, error) {
+	profile, err := scanUserProfile(p.pool.QueryRow(ctx, `SELECT id,nickname,avatar_url,gender,country,province,city,updated_at FROM user_profiles WHERE id=$1`, userID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &profile, nil
+}
+
+func (p *Postgres) UpsertUserProfile(ctx context.Context, profile domain.UserProfile) (domain.UserProfile, error) {
+	return scanUserProfile(p.pool.QueryRow(ctx, `INSERT INTO user_profiles
+    (id,nickname,avatar_url,gender,country,province,city,updated_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    ON CONFLICT (id) DO UPDATE SET nickname=EXCLUDED.nickname,avatar_url=EXCLUDED.avatar_url,
+      gender=EXCLUDED.gender,country=EXCLUDED.country,province=EXCLUDED.province,
+      city=EXCLUDED.city,updated_at=EXCLUDED.updated_at
+    RETURNING id,nickname,avatar_url,gender,country,province,city,updated_at`,
+		profile.ID, profile.Nickname, profile.AvatarURL, profile.Gender, profile.Country,
+		profile.Province, profile.City, profile.UpdatedAt))
+}
+
+func (p *Postgres) CreateEvent(ctx context.Context, event domain.Event) (domain.Event, error) {
+	equipment, _ := json.Marshal(event.EquipmentRequirements)
+	ability, _ := json.Marshal(event.AbilityRequirements)
+	row := p.pool.QueryRow(ctx, `INSERT INTO events (
+    id, organizer_id, roadbook_id, title, summary, start_at, registration_deadline,
+    meeting_point, difficulty, distance_km, elevation_gain_m, speed_min_kph,
+    speed_max_kph, capacity, registration_count, equipment_requirements,
+    ability_requirements, safety_notice, status, created_at, updated_at, version
+  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17::jsonb,$18,$19,$20,$21,$22)
+  RETURNING `+eventColumns,
+		event.ID, event.OrganizerID, event.RouteID, event.Title, event.Summary, event.StartAt,
+		event.RegistrationDeadline, event.MeetingPoint, event.Difficulty, event.DistanceKM,
+		event.ElevationGainM, event.SpeedMinKPH, event.SpeedMaxKPH, event.Capacity,
+		event.RegistrationCount, string(equipment), string(ability), event.SafetyNotice, event.Status,
+		event.CreatedAt, event.UpdatedAt, event.Version)
+	created, err := scanEvent(row)
+	return created, translateWriteError(err, "EVENT_EXISTS", "活动已存在")
+}
+
+func (p *Postgres) UpdateEvent(ctx context.Context, event domain.Event) (domain.Event, error) {
+	equipment, _ := json.Marshal(event.EquipmentRequirements)
+	ability, _ := json.Marshal(event.AbilityRequirements)
+	updated, err := scanEvent(p.pool.QueryRow(ctx, `UPDATE events SET
+    roadbook_id=$2,title=$3,summary=$4,start_at=$5,registration_deadline=$6,
+    meeting_point=$7,difficulty=$8,distance_km=$9,elevation_gain_m=$10,
+    speed_min_kph=$11,speed_max_kph=$12,capacity=$13,registration_count=$14,
+    equipment_requirements=$15::jsonb,ability_requirements=$16::jsonb,
+    safety_notice=$17,status=$18,updated_at=$19,version=$20
+	WHERE id=$1 AND version=$21 RETURNING `+eventColumns,
+		event.ID, event.RouteID, event.Title, event.Summary, event.StartAt,
+		event.RegistrationDeadline, event.MeetingPoint, event.Difficulty, event.DistanceKM,
+		event.ElevationGainM, event.SpeedMinKPH, event.SpeedMaxKPH, event.Capacity,
+		event.RegistrationCount, string(equipment), string(ability), event.SafetyNotice, event.Status,
+		event.UpdatedAt, event.Version, event.Version-1))
+	if errors.Is(err, pgx.ErrNoRows) {
+		current, lookupErr := p.GetEvent(ctx, event.ID)
+		if lookupErr != nil {
+			return domain.Event{}, lookupErr
+		}
+		if current == nil {
+			return domain.Event{}, domain.NotFound("活动")
+		}
+		return domain.Event{}, domain.Conflict("EVENT_VERSION_CONFLICT", "活动已被其他操作更新，请刷新后重试")
+	}
+	return updated, err
+}
+
+func (p *Postgres) GetEvent(ctx context.Context, id string) (*domain.Event, error) {
+	event, err := scanEvent(p.pool.QueryRow(ctx, `SELECT `+eventColumns+` FROM events WHERE id=$1`, id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &event, nil
+}
+
+func (p *Postgres) ListEvents(ctx context.Context, query domain.EventListQuery) (domain.Page[domain.Event], error) {
+	statuses := []string{string(domain.EventPublished), string(domain.EventFull)}
+	if query.Status != nil {
+		statuses = []string{string(*query.Status)}
+	}
+	args := []any{statuses, query.Limit + 1}
+	where := `status = ANY($1::event_status[])`
+	if query.Difficulty != nil {
+		args = append(args, *query.Difficulty)
+		where += fmt.Sprintf(` AND difficulty=$%d::difficulty_level`, len(args))
+	}
+	if query.Cursor != nil {
+		cursor, err := p.GetEvent(ctx, *query.Cursor)
+		if err != nil {
+			return domain.Page[domain.Event]{}, err
+		}
+		if cursor != nil {
+			args = append(args, cursor.StartAt, cursor.ID)
+			where += fmt.Sprintf(` AND (start_at,id)>($%d::timestamptz,$%d::uuid)`, len(args)-1, len(args))
+		}
+	}
+	rows, err := p.pool.Query(ctx, `SELECT `+eventColumns+` FROM events WHERE `+where+` ORDER BY start_at ASC,id ASC LIMIT $2`, args...)
+	if err != nil {
+		return domain.Page[domain.Event]{}, err
+	}
+	defer rows.Close()
+	items := make([]domain.Event, 0, query.Limit+1)
+	for rows.Next() {
+		event, err := scanEvent(rows)
+		if err != nil {
+			return domain.Page[domain.Event]{}, err
+		}
+		items = append(items, event)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.Page[domain.Event]{}, err
+	}
+	return pageEvents(items, query.Limit), nil
+}
+
+func (p *Postgres) ListEventsByOrganizer(ctx context.Context, organizerID string) ([]domain.Event, error) {
+	rows, err := p.pool.Query(ctx, `SELECT `+eventColumns+` FROM events WHERE organizer_id=$1 ORDER BY created_at DESC,id ASC`, organizerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]domain.Event, 0)
+	for rows.Next() {
+		event, err := scanEvent(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, event)
+	}
+	return items, rows.Err()
+}
+
+func (p *Postgres) CreateRoadbook(ctx context.Context, roadbook domain.Roadbook) (domain.Roadbook, error) {
+	var created domain.Roadbook
+	err := p.withTransaction(ctx, func(tx pgx.Tx) error {
+		coordinates := make([][2]float64, len(roadbook.Track))
+		for index, point := range roadbook.Track {
+			coordinates[index] = [2]float64{point.Longitude, point.Latitude}
+		}
+		geoJSON, _ := json.Marshal(map[string]any{"type": "LineString", "coordinates": coordinates})
+		elevation, _ := json.Marshal(roadbook.ElevationProfile)
+		stored, err := scanRoadbook(tx.QueryRow(ctx, `INSERT INTO roadbooks (
+      id,owner_id,name,description,distance_km,elevation_gain_m,estimated_minutes,
+      difficulty,region,coordinate_system,track,elevation_profile,max_gradient,created_at,updated_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,ST_SetSRID(ST_GeomFromGeoJSON($11),4326)::geography,$12::jsonb,$13,$14,$15)
+    RETURNING `+roadbookColumns,
+			roadbook.ID, roadbook.OwnerID, roadbook.Name, roadbook.Description, roadbook.DistanceKM,
+			roadbook.ElevationGainM, roadbook.EstimatedMinutes, roadbook.Difficulty, roadbook.Region,
+			roadbook.CoordinateSystem, string(geoJSON), string(elevation), roadbook.MaxGradient, roadbook.CreatedAt, roadbook.UpdatedAt))
+		if err != nil {
+			return err
+		}
+		for index, waypoint := range roadbook.Waypoints {
+			_, err = tx.Exec(ctx, `INSERT INTO roadbook_waypoints
+        (roadbook_id,name,waypoint_type,location,distance_km,sort_order)
+        VALUES ($1,$2,$3,ST_SetSRID(ST_MakePoint($4,$5),4326)::geography,$6,$7)`,
+				roadbook.ID, waypoint.Name, waypoint.Type, waypoint.Longitude, waypoint.Latitude, waypoint.DistanceKM, index)
+			if err != nil {
+				return err
+			}
+		}
+		stored.Waypoints = append([]domain.Waypoint(nil), roadbook.Waypoints...)
+		created = stored
+		return nil
+	})
+	return created, translateWriteError(err, "ROADBOOK_EXISTS", "路书已存在")
+}
+
+func (p *Postgres) GetRoadbook(ctx context.Context, id string) (*domain.Roadbook, error) {
+	roadbook, err := scanRoadbook(p.pool.QueryRow(ctx, `SELECT `+roadbookColumns+` FROM roadbooks WHERE id=$1`, id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	waypoints, err := p.loadWaypoints(ctx, []string{id})
+	if err != nil {
+		return nil, err
+	}
+	roadbook.Waypoints = waypoints[id]
+	return &roadbook, nil
+}
+
+func (p *Postgres) ListRoadbooks(ctx context.Context, limit int, cursor *string) (domain.Page[domain.Roadbook], error) {
+	args := []any{limit + 1}
+	where := ""
+	if cursor != nil {
+		book, err := p.GetRoadbook(ctx, *cursor)
+		if err != nil {
+			return domain.Page[domain.Roadbook]{}, err
+		}
+		if book != nil {
+			args = append(args, book.CreatedAt, book.ID)
+			where = `WHERE created_at<$2::timestamptz OR (created_at=$2::timestamptz AND id>$3::uuid)`
+		}
+	}
+	rows, err := p.pool.Query(ctx, `SELECT `+roadbookColumns+` FROM roadbooks `+where+` ORDER BY created_at DESC,id ASC LIMIT $1`, args...)
+	if err != nil {
+		return domain.Page[domain.Roadbook]{}, err
+	}
+	defer rows.Close()
+	items := make([]domain.Roadbook, 0, limit+1)
+	ids := make([]string, 0, limit+1)
+	for rows.Next() {
+		item, err := scanRoadbook(rows)
+		if err != nil {
+			return domain.Page[domain.Roadbook]{}, err
+		}
+		items = append(items, item)
+		ids = append(ids, item.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.Page[domain.Roadbook]{}, err
+	}
+	waypoints, err := p.loadWaypoints(ctx, ids)
+	if err != nil {
+		return domain.Page[domain.Roadbook]{}, err
+	}
+	for index := range items {
+		items[index].Waypoints = waypoints[items[index].ID]
+	}
+	return pageRoadbooks(items, limit), nil
+}
+
+func (p *Postgres) RegisterAtomically(ctx context.Context, command domain.RegisterCommand) (domain.RegistrationResult, error) {
+	var result domain.RegistrationResult
+	err := p.withTransaction(ctx, func(tx pgx.Tx) error {
+		event, err := scanEvent(tx.QueryRow(ctx, `SELECT `+eventColumns+` FROM events WHERE id=$1 FOR UPDATE`, command.EventID))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.NotFound("活动")
+		}
+		if err != nil {
+			return err
+		}
+		var replayJSON []byte
+		err = tx.QueryRow(ctx, `SELECT response_body FROM registration_idempotency WHERE user_id=$1 AND event_id=$2 AND idempotency_key=$3`, command.UserID, command.EventID, command.IdempotencyKey).Scan(&replayJSON)
+		if err == nil {
+			if err := json.Unmarshal(replayJSON, &result); err != nil {
+				return fmt.Errorf("decode idempotency response: %w", err)
+			}
+			result.Replayed = true
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if event.Status != domain.EventPublished && event.Status != domain.EventFull {
+			return domain.InvalidState("当前活动状态不可报名")
+		}
+		if !command.Now.Before(event.RegistrationDeadline) {
+			return domain.Conflict("REGISTRATION_CLOSED", "报名已截止")
+		}
+		existing, err := scanRegistration(tx.QueryRow(ctx, `SELECT `+registrationColumns+` FROM registrations WHERE event_id=$1 AND user_id=$2 FOR UPDATE`, command.EventID, command.UserID))
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if err == nil && existing.Status == domain.RegistrationActive {
+			return domain.Conflict("ALREADY_REGISTERED", "请勿重复报名")
+		}
+		if event.RegistrationCount >= event.Capacity {
+			return domain.Conflict("EVENT_FULL", "活动名额已满")
+		}
+		registrationID := uuid.NewString()
+		if err == nil {
+			registrationID = existing.ID
+		}
+		registration, err := scanRegistration(tx.QueryRow(ctx, `INSERT INTO registrations (
+      id,event_id,user_id,status,ability_confirmed,equipment_confirmed,waiver_version,
+      waiver_accepted_at,phone_encrypted,emergency_contact_encrypted,bike_type,cancelled_at,created_at,updated_at
+    ) VALUES ($1,$2,$3,'active',$4,$5,$6,$7,$8,$9,$10,NULL,$7,$7)
+    ON CONFLICT (event_id,user_id) DO UPDATE SET status='active',ability_confirmed=EXCLUDED.ability_confirmed,
+      equipment_confirmed=EXCLUDED.equipment_confirmed,waiver_version=EXCLUDED.waiver_version,
+      waiver_accepted_at=EXCLUDED.waiver_accepted_at,phone_encrypted=EXCLUDED.phone_encrypted,
+      emergency_contact_encrypted=EXCLUDED.emergency_contact_encrypted,bike_type=EXCLUDED.bike_type,
+      cancelled_at=NULL,updated_at=EXCLUDED.updated_at RETURNING `+registrationColumns,
+			registrationID, command.EventID, command.UserID, command.AbilityConfirmed,
+			command.EquipmentConfirmed, command.WaiverVersion, command.Now, command.PhoneEncrypted,
+			command.EmergencyContactEncrypted, command.BikeType))
+		if err != nil {
+			return err
+		}
+		updatedEvent, err := scanEvent(tx.QueryRow(ctx, `UPDATE events SET
+      registration_count=registration_count+1,
+      status=CASE WHEN registration_count+1=capacity THEN 'full'::event_status ELSE 'published'::event_status END,
+      updated_at=$2,version=version+1 WHERE id=$1 RETURNING `+eventColumns, command.EventID, command.Now))
+		if err != nil {
+			return err
+		}
+		result = domain.RegistrationResult{Registration: registration, Event: updatedEvent, Replayed: false}
+		encoded, err := json.Marshal(result)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `INSERT INTO registration_idempotency (user_id,event_id,idempotency_key,response_status,response_body) VALUES ($1,$2,$3,201,$4::jsonb)`, command.UserID, command.EventID, command.IdempotencyKey, string(encoded))
+		return err
+	})
+	return result, err
+}
+
+func (p *Postgres) CancelRegistrationAtomically(ctx context.Context, eventID, userID string, now time.Time) (domain.RegistrationResult, error) {
+	var result domain.RegistrationResult
+	err := p.withTransaction(ctx, func(tx pgx.Tx) error {
+		event, err := scanEvent(tx.QueryRow(ctx, `SELECT `+eventColumns+` FROM events WHERE id=$1 FOR UPDATE`, eventID))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.NotFound("活动")
+		}
+		if err != nil {
+			return err
+		}
+		registration, err := scanRegistration(tx.QueryRow(ctx, `SELECT `+registrationColumns+` FROM registrations WHERE event_id=$1 AND user_id=$2 FOR UPDATE`, eventID, userID))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.NotFound("报名记录")
+		}
+		if err != nil {
+			return err
+		}
+		if registration.Status == domain.RegistrationCancelled {
+			result = domain.RegistrationResult{Registration: registration, Event: event, Replayed: true}
+			return nil
+		}
+		if event.Status == domain.EventCompleted || event.Status == domain.EventCancelled {
+			return domain.InvalidState("当前活动状态不可取消报名")
+		}
+		registration, err = scanRegistration(tx.QueryRow(ctx, `UPDATE registrations SET status='cancelled',cancelled_at=$3,updated_at=$3 WHERE event_id=$1 AND user_id=$2 RETURNING `+registrationColumns, eventID, userID, now))
+		if err != nil {
+			return err
+		}
+		event, err = scanEvent(tx.QueryRow(ctx, `UPDATE events SET registration_count=GREATEST(0,registration_count-1),status=CASE WHEN status='full' THEN 'published'::event_status ELSE status END,updated_at=$2,version=version+1 WHERE id=$1 RETURNING `+eventColumns, eventID, now))
+		if err != nil {
+			return err
+		}
+		result = domain.RegistrationResult{Registration: registration, Event: event, Replayed: false}
+		return nil
+	})
+	return result, err
+}
+
+func (p *Postgres) GetRegistration(ctx context.Context, eventID, userID string) (*domain.Registration, error) {
+	registration, err := scanRegistration(p.pool.QueryRow(ctx, `SELECT `+registrationColumns+` FROM registrations WHERE event_id=$1 AND user_id=$2`, eventID, userID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &registration, nil
+}
+
+func (p *Postgres) ListRegistrationsByUser(ctx context.Context, userID string) ([]domain.UserRegistration, error) {
+	rows, err := p.pool.Query(ctx, `SELECT
+    r.id,r.event_id,r.user_id,r.status,r.ability_confirmed,r.equipment_confirmed,
+    r.waiver_version,r.waiver_accepted_at,r.created_at,r.updated_at,r.cancelled_at,
+    e.id,e.organizer_id,e.roadbook_id,e.title,e.summary,e.start_at,e.registration_deadline,
+    e.meeting_point,e.difficulty,e.distance_km,e.elevation_gain_m,e.speed_min_kph,
+    e.speed_max_kph,e.capacity,e.registration_count,e.equipment_requirements,
+    e.ability_requirements,e.safety_notice,e.status,e.created_at,e.updated_at,e.version
+    FROM registrations r JOIN events e ON e.id=r.event_id WHERE r.user_id=$1
+    ORDER BY e.start_at DESC,r.updated_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]domain.UserRegistration, 0)
+	for rows.Next() {
+		registration, event, err := scanUserRegistration(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, domain.UserRegistration{Registration: registration, Event: event})
+	}
+	return items, rows.Err()
+}
+
+type scanner interface{ Scan(...any) error }
+
+func scanEvent(row scanner) (domain.Event, error) {
+	var event domain.Event
+	var routeID *string
+	var equipment, ability []byte
+	err := row.Scan(&event.ID, &event.OrganizerID, &routeID, &event.Title, &event.Summary,
+		&event.StartAt, &event.RegistrationDeadline, &event.MeetingPoint, &event.Difficulty,
+		&event.DistanceKM, &event.ElevationGainM, &event.SpeedMinKPH, &event.SpeedMaxKPH,
+		&event.Capacity, &event.RegistrationCount, &equipment, &ability, &event.SafetyNotice,
+		&event.Status, &event.CreatedAt, &event.UpdatedAt, &event.Version)
+	if err != nil {
+		return domain.Event{}, err
+	}
+	event.RouteID = routeID
+	if err := json.Unmarshal(equipment, &event.EquipmentRequirements); err != nil {
+		return domain.Event{}, err
+	}
+	if err := json.Unmarshal(ability, &event.AbilityRequirements); err != nil {
+		return domain.Event{}, err
+	}
+	return event, nil
+}
+
+func scanRoadbook(row scanner) (domain.Roadbook, error) {
+	var book domain.Roadbook
+	var trackJSON, elevationJSON []byte
+	err := row.Scan(&book.ID, &book.OwnerID, &book.Name, &book.Description, &book.DistanceKM,
+		&book.ElevationGainM, &book.EstimatedMinutes, &book.Difficulty, &book.Region,
+		&book.CoordinateSystem, &trackJSON, &elevationJSON, &book.MaxGradient, &book.CreatedAt, &book.UpdatedAt)
+	if err != nil {
+		return domain.Roadbook{}, err
+	}
+	var geometry struct {
+		Coordinates [][2]float64 `json:"coordinates"`
+	}
+	if err := json.Unmarshal(trackJSON, &geometry); err != nil {
+		return domain.Roadbook{}, err
+	}
+	book.Track = make([]domain.TrackPoint, len(geometry.Coordinates))
+	for index, point := range geometry.Coordinates {
+		book.Track[index] = domain.TrackPoint{Longitude: point[0], Latitude: point[1]}
+	}
+	if err := json.Unmarshal(elevationJSON, &book.ElevationProfile); err != nil {
+		return domain.Roadbook{}, err
+	}
+	return book, nil
+}
+
+func scanRegistration(row scanner) (domain.Registration, error) {
+	var registration domain.Registration
+	err := row.Scan(&registration.ID, &registration.EventID, &registration.UserID,
+		&registration.Status, &registration.AbilityConfirmed, &registration.EquipmentConfirmed,
+		&registration.WaiverVersion, &registration.WaiverAcceptedAt, &registration.CreatedAt,
+		&registration.UpdatedAt, &registration.CancelledAt)
+	return registration, err
+}
+
+func scanUserProfile(row scanner) (domain.UserProfile, error) {
+	var profile domain.UserProfile
+	err := row.Scan(&profile.ID, &profile.Nickname, &profile.AvatarURL, &profile.Gender,
+		&profile.Country, &profile.Province, &profile.City, &profile.UpdatedAt)
+	return profile, err
+}
+
+func scanUserRegistration(row scanner) (domain.Registration, domain.Event, error) {
+	var registration domain.Registration
+	var event domain.Event
+	var routeID *string
+	var equipment, ability []byte
+	err := row.Scan(&registration.ID, &registration.EventID, &registration.UserID,
+		&registration.Status, &registration.AbilityConfirmed, &registration.EquipmentConfirmed,
+		&registration.WaiverVersion, &registration.WaiverAcceptedAt, &registration.CreatedAt,
+		&registration.UpdatedAt, &registration.CancelledAt,
+		&event.ID, &event.OrganizerID, &routeID, &event.Title, &event.Summary,
+		&event.StartAt, &event.RegistrationDeadline, &event.MeetingPoint, &event.Difficulty,
+		&event.DistanceKM, &event.ElevationGainM, &event.SpeedMinKPH, &event.SpeedMaxKPH,
+		&event.Capacity, &event.RegistrationCount, &equipment, &ability, &event.SafetyNotice,
+		&event.Status, &event.CreatedAt, &event.UpdatedAt, &event.Version)
+	if err != nil {
+		return domain.Registration{}, domain.Event{}, err
+	}
+	event.RouteID = routeID
+	if err := json.Unmarshal(equipment, &event.EquipmentRequirements); err != nil {
+		return domain.Registration{}, domain.Event{}, err
+	}
+	if err := json.Unmarshal(ability, &event.AbilityRequirements); err != nil {
+		return domain.Registration{}, domain.Event{}, err
+	}
+	return registration, event, nil
+}
+
+func (p *Postgres) loadWaypoints(ctx context.Context, ids []string) (map[string][]domain.Waypoint, error) {
+	result := make(map[string][]domain.Waypoint, len(ids))
+	if len(ids) == 0 {
+		return result, nil
+	}
+	rows, err := p.pool.Query(ctx, `SELECT roadbook_id,name,waypoint_type,ST_X(location::geometry),ST_Y(location::geometry),distance_km FROM roadbook_waypoints WHERE roadbook_id=ANY($1::uuid[]) ORDER BY roadbook_id,sort_order`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var waypoint domain.Waypoint
+		if err := rows.Scan(&id, &waypoint.Name, &waypoint.Type, &waypoint.Longitude, &waypoint.Latitude, &waypoint.DistanceKM); err != nil {
+			return nil, err
+		}
+		result[id] = append(result[id], waypoint)
+	}
+	return result, rows.Err()
+}
+
+func (p *Postgres) withTransaction(ctx context.Context, action func(pgx.Tx) error) error {
+	tx, err := p.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	if err := action(tx); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func translateWriteError(err error, code, message string) error {
+	if err == nil {
+		return nil
+	}
+	var pgError *pgconn.PgError
+	if errors.As(err, &pgError) && pgError.Code == "23505" {
+		return domain.Conflict(code, message)
+	}
+	return err
+}
+
+func pageEvents(items []domain.Event, limit int) domain.Page[domain.Event] {
+	result := domain.Page[domain.Event]{Items: items}
+	if len(items) > limit {
+		result.Items = items[:limit]
+		cursor := result.Items[len(result.Items)-1].ID
+		result.NextCursor = &cursor
+	}
+	return result
+}
+
+func pageRoadbooks(items []domain.Roadbook, limit int) domain.Page[domain.Roadbook] {
+	result := domain.Page[domain.Roadbook]{Items: items}
+	if len(items) > limit {
+		result.Items = items[:limit]
+		cursor := result.Items[len(result.Items)-1].ID
+		result.NextCursor = &cursor
+	}
+	return result
+}
