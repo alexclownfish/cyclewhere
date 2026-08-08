@@ -1,4 +1,4 @@
-import type { Registration, RideEvent, RideRoute } from '../types/domain.ts';
+import type { Registration, RideEvent, RideRoute } from '../types/domain';
 
 export const routes: RideRoute[] = [
   {

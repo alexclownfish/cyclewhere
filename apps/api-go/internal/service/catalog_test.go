@@ -96,6 +96,12 @@ func (r *testRepository) GetRegistration(_ context.Context, _, _ string) (*domai
 func (r *testRepository) ListRegistrationsByUser(_ context.Context, _ string) ([]domain.UserRegistration, error) {
 	return []domain.UserRegistration{}, nil
 }
+func (r *testRepository) ListEventParticipants(_ context.Context, _ string) ([]domain.EventParticipant, error) {
+	return []domain.EventParticipant{}, nil
+}
+func (r *testRepository) GetEventParticipantContact(_ context.Context, _, _ string) (*domain.EventParticipantContact, error) {
+	return nil, nil
+}
 
 func fixtureEvent() domain.Event {
 	return domain.Event{

@@ -32,6 +32,14 @@ func eventResponse(event domain.Event) gin.H {
 	}
 }
 
+func eventDetailResponse(event domain.Event, organizer *domain.UserProfile, ownedByViewer bool) gin.H {
+	response := eventResponse(event)
+	delete(response, "organizerId")
+	response["organizerProfile"] = publicProfileResponse(organizer)
+	response["ownedByMe"] = ownedByViewer
+	return response
+}
+
 func pageEventResponse(page domain.Page[domain.Event]) gin.H {
 	items := make([]any, len(page.Items))
 	for index, item := range page.Items {
@@ -88,6 +96,24 @@ func registrationResponse(registration domain.Registration) gin.H {
 
 func registrationResultResponse(result domain.RegistrationResult) gin.H {
 	return gin.H{"registration": registrationResponse(result.Registration), "event": eventResponse(result.Event), "replayed": result.Replayed}
+}
+
+func participantResponse(participant domain.EventParticipant) gin.H {
+	return gin.H{"nickname": participant.Nickname, "avatarUrl": participant.AvatarURL, "isOrganizer": participant.IsOrganizer}
+}
+
+func participantContactResponse(contact domain.EventParticipantContact, phone, emergencyContact string) gin.H {
+	return gin.H{
+		"nickname": contact.Nickname, "avatarUrl": contact.AvatarURL,
+		"phone": phone, "emergencyContact": emergencyContact, "bikeType": contact.BikeType,
+	}
+}
+
+func publicProfileResponse(profile *domain.UserProfile) any {
+	if profile == nil {
+		return gin.H{"nickname": nil, "avatarUrl": nil}
+	}
+	return gin.H{"nickname": profile.Nickname, "avatarUrl": profile.AvatarURL}
 }
 
 func profileResponse(profile *domain.UserProfile) any {

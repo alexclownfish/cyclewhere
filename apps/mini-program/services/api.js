@@ -96,6 +96,23 @@ function createRealApi(transport, currentUser, authHeaders) {
             return transport({ ...spec, header: { ...spec.header, ...(await authHeaders(true)) } });
         }
     }
+    async function optionalAuthRequest(spec) {
+        let headers;
+        try {
+            headers = await authHeaders();
+        }
+        catch {
+            return transport(spec);
+        }
+        try {
+            return await transport({ ...spec, header: { ...spec.header, ...headers } });
+        }
+        catch (error) {
+            if (!(error instanceof ApiError) || error.statusCode !== 401)
+                throw error;
+            return transport(spec);
+        }
+    }
     async function loadAllPages(url) {
         const items = [];
         let cursor = null;
@@ -158,11 +175,22 @@ function createRealApi(transport, currentUser, authHeaders) {
             return events.map((item) => (0, api_contract_1.mapEvent)(item, item.routeId ? routeById.get(item.routeId) : undefined, currentUserId()));
         },
         async getEvent(id) {
-            const event = await transport({ url: `/api/v1/events/${id}`, method: 'GET' });
+            const event = await optionalAuthRequest({ url: `/api/v1/events/${id}`, method: 'GET' });
             const route = event.routeId
                 ? (0, api_contract_1.mapRoadbook)(await transport({ url: `/api/v1/routes/${event.routeId}`, method: 'GET' }))
                 : undefined;
             return (0, api_contract_1.mapEvent)(event, route, currentUserId());
+        },
+        async getEventParticipants(eventId) {
+            const result = await optionalAuthRequest({
+                url: `/api/v1/events/${eventId}/participants`, method: 'GET',
+            });
+            return result.items;
+        },
+        async getEventParticipantContact(eventId, contactId) {
+            return protectedRequest({
+                url: `/api/v1/events/${eventId}/participants/${contactId}/contact`, method: 'GET',
+            });
         },
         async listRoutes() {
             return (await loadRoadbooks()).map(api_contract_1.mapRoadbook);
@@ -336,4 +364,5 @@ exports.api = env_1.USE_MOCK ? {
     bindPhone: async () => ({ id: 'mock-user', nickname: '微信骑友', avatarUrl: null, phoneMasked: '138****8000', city: '' }),
     registerProfile: async (nickname) => ({ id: 'mock-user', nickname, avatarUrl: null, city: '' }),
     register: (eventId, input) => mock_api_1.mockApi.register(eventId, input),
+    getEventParticipantContact: async () => ({ nickname: '微信骑友', avatarUrl: null, phone: '138****8000', emergencyContact: '未填写', bikeType: '公路车' }),
 } : realApi;

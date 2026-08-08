@@ -40,6 +40,7 @@ export interface RideEvent {
   title: string;
   coverUrl?: string | null;
   organizer: string;
+  organizerAvatarUrl?: string | null;
   startAt: string;
   registrationDeadline: string;
   meetingPoint: string;
@@ -103,6 +104,21 @@ export interface UserProfile {
   country?: string | null;
   province?: string | null;
   city?: string | null;
+}
+
+export interface EventParticipant {
+  nickname: string | null;
+  avatarUrl: string | null;
+  isOrganizer: boolean;
+  contactId?: string;
+}
+
+export interface EventParticipantContact {
+  nickname: string | null;
+  avatarUrl: string | null;
+  phone: string;
+  emergencyContact: string;
+  bikeType: string;
 }
 
 export interface ApiEnvelope<T> {

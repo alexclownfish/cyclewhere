@@ -42,4 +42,6 @@ type Repository interface {
 	CancelRegistrationAtomically(context.Context, string, string, time.Time) (RegistrationResult, error)
 	GetRegistration(context.Context, string, string) (*Registration, error)
 	ListRegistrationsByUser(context.Context, string) ([]UserRegistration, error)
+	ListEventParticipants(context.Context, string) ([]EventParticipant, error)
+	GetEventParticipantContact(context.Context, string, string) (*EventParticipantContact, error)
 }

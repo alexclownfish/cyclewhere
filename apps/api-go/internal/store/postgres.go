@@ -462,6 +462,53 @@ func (p *Postgres) ListRegistrationsByUser(ctx context.Context, userID string) (
 	return items, rows.Err()
 }
 
+func (p *Postgres) ListEventParticipants(ctx context.Context, eventID string) ([]domain.EventParticipant, error) {
+	rows, err := p.pool.Query(ctx, `SELECT participant_id,nickname,avatar_url,is_organizer
+  FROM (
+    SELECT e.organizer_id AS participant_id,p.nickname,p.avatar_url,true AS is_organizer,e.created_at,e.organizer_id AS sort_id
+    FROM events e
+    LEFT JOIN user_profiles p ON p.id=e.organizer_id
+    WHERE e.id=$1
+    UNION ALL
+    SELECT r.id AS participant_id,p.nickname,p.avatar_url,false AS is_organizer,r.created_at,r.id AS sort_id
+    FROM registrations r
+    LEFT JOIN user_profiles p ON p.id=r.user_id
+    WHERE r.event_id=$1 AND r.status='active' AND r.user_id <> (SELECT organizer_id FROM events WHERE id=$1)
+  ) participants
+  ORDER BY is_organizer DESC, created_at ASC, sort_id ASC`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]domain.EventParticipant, 0)
+	for rows.Next() {
+		var participant domain.EventParticipant
+		if err := rows.Scan(&participant.ID, &participant.Nickname, &participant.AvatarURL, &participant.IsOrganizer); err != nil {
+			return nil, err
+		}
+		items = append(items, participant)
+	}
+	return items, rows.Err()
+}
+
+func (p *Postgres) GetEventParticipantContact(ctx context.Context, eventID, participantID string) (*domain.EventParticipantContact, error) {
+	var contact domain.EventParticipantContact
+	err := p.pool.QueryRow(ctx, `SELECT r.id,p.nickname,p.avatar_url,r.phone_encrypted,
+    r.emergency_contact_encrypted,r.bike_type
+    FROM registrations r
+    LEFT JOIN user_profiles p ON p.id=r.user_id
+    WHERE r.event_id=$1 AND r.id=$2 AND r.status='active'`, eventID, participantID).Scan(
+		&contact.ID, &contact.Nickname, &contact.AvatarURL, &contact.PhoneEncrypted,
+		&contact.EmergencyContactEncrypted, &contact.BikeType)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &contact, nil
+}
+
 type scanner interface{ Scan(...any) error }
 
 func scanEvent(row scanner) (domain.Event, error) {

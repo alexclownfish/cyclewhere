@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "build:wechat": "tsc -p tsconfig.wechat.json",
     "test": "tsx --test tests/*.test.ts"
   },
   "devDependencies": {

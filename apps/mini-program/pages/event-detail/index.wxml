@@ -6,11 +6,37 @@
     <view class="summary">
       <view class="row-between"><view><text class="badge {{event.status === 'published' ? 'badge-red' : ''}}">{{statusText}}</text><text wx:if="{{event.approvalRequired}}" class="badge">审核制</text></view><text class="small">剩余 {{remaining}} 位</text></view>
       <view class="detail-title">{{event.title}}</view>
-      <view class="organizer"><view class="avatar">北</view><view class="organizer-copy"><view>{{event.organizer}}</view><view class="small">活动组织者</view></view><view class="verified-mark">✓</view></view>
+      <view class="organizer"><view class="avatar"><image wx:if="{{event.organizerAvatarUrl}}" class="avatar-image" src="{{event.organizerAvatarUrl}}" mode="aspectFill" /><text wx:else>{{organizerInitial}}</text></view><view class="organizer-copy"><view>{{event.organizer}}</view><view class="small">活动组织者</view></view><view class="verified-mark">✓</view></view>
     </view>
     <view class="detail-section">
       <view class="section-kicker">RIDE PLAN</view><view class="form-title">出发信息</view>
       <view class="info-grid"><view class="info"><text class="info-label">时间</text><text>{{dateText}}</text></view><view class="info"><text class="info-label">集合</text><text>{{event.meetingPoint}}</text></view><view class="info"><text class="info-label">巡航</text><text>{{event.speedRange}}</text></view><view class="info"><text class="info-label">规模</text><text>{{event.registeredCount}} / {{event.capacity}} 人</text></view></view>
+    </view>
+    <view class="detail-section participants-section">
+      <view class="participants-heading">
+        <view><view class="section-kicker">RIDERS</view><view class="form-title">一起出发的骑友</view></view>
+        <view class="participant-count">{{participants.length}} 位同行</view>
+      </view>
+      <view wx:if="{{participantsLoading}}" class="participants-loading"><text class="loading-dot"></text>正在同步报名骑友</view>
+      <view wx:elif="{{participantsError}}" class="participants-failed">
+        <view>报名骑友暂时加载失败</view>
+        <button class="participants-retry" bindtap="loadParticipants">重新加载</button>
+      </view>
+      <view wx:elif="{{!participants.length}}" class="participants-empty">
+        <view class="participants-empty-mark">+</view>
+        <view><view class="participants-empty-title">还没有骑友报名</view><view class="participants-empty-copy">成为第一位加入这场骑行的骑友</view></view>
+      </view>
+      <view wx:else class="participant-grid">
+        <view wx:for="{{participants}}" wx:for-index="index" wx:key="key" class="participant-item {{item.contactId ? 'participant-actionable' : ''}}" data-participant-index="{{index}}" bindtap="openParticipant">
+          <view class="participant-avatar">
+            <image wx:if="{{item.avatarUrl}}" class="participant-avatar-image" src="{{item.avatarUrl}}" mode="aspectFill" lazy-load />
+            <text wx:else>{{item.avatarText}}</text>
+          </view>
+          <view class="participant-name">{{item.displayName}}</view>
+          <view wx:if="{{item.isOrganizer}}" class="participant-role">组织者</view>
+          <view wx:elif="{{item.contactLoading}}" class="participant-role">加载中</view>
+        </view>
+      </view>
     </view>
     <view class="detail-section route-entry" bindtap="openRoute">
       <view class="row-between"><view><view class="form-title route-name">{{event.route.name}}</view><view class="small">{{event.route.distanceKm}} km · 爬升 {{event.route.elevationGainM}} m · {{event.route.difficulty}}</view></view><text class="chevron">›</text></view>

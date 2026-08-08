@@ -1,9 +1,9 @@
 import { API_BASE_URL, USE_MOCK, WAIVER_VERSION } from '../config/env';
-import type { ApiEnvelope, MyRegistrationRecord, PublishEventInput, Registration, RegistrationInput, RideEvent, RideRoute, UserProfile } from '../types/domain';
+import type { ApiEnvelope, EventParticipant, EventParticipantContact, MyRegistrationRecord, PublishEventInput, Registration, RegistrationInput, RideEvent, RideRoute, UserProfile } from '../types/domain';
 import { mockApi } from './mock-api';
 import {
   mapEvent, mapRegistration, mapRoadbook, toCreateEvent,
-  type BackendEvent, type BackendPage, type BackendRegistrationResult, type BackendRoadbook, type BackendUserRegistration,
+  type BackendEvent, type BackendEventParticipant, type BackendPage, type BackendRegistrationResult, type BackendRoadbook, type BackendUserRegistration,
 } from './api-contract';
 
 export interface RequestSpec {
@@ -33,6 +33,8 @@ export interface ClientApi {
   registerProfile(nickname: string, avatarFilePath: string, forceRefresh?: boolean): Promise<UserProfile>;
   listEvents(): Promise<RideEvent[]>;
   getEvent(id: string): Promise<RideEvent>;
+  getEventParticipants(eventId: string): Promise<EventParticipant[]>;
+  getEventParticipantContact(eventId: string, contactId: string): Promise<EventParticipantContact>;
   listRoutes(): Promise<RideRoute[]>;
   getRoute(id: string): Promise<RideRoute>;
   getRegistrationStatus(eventId: string): Promise<Registration | null>;
@@ -137,6 +139,20 @@ export function createRealApi(transport: Transport, currentUser: UserProvider, a
       return transport<T>({ ...spec, header: { ...spec.header, ...(await authHeaders(true)) } });
     }
   }
+  async function optionalAuthRequest<T>(spec: RequestSpec): Promise<T> {
+    let headers: Record<string, string>;
+    try {
+      headers = await authHeaders();
+    } catch {
+      return transport<T>(spec);
+    }
+    try {
+      return await transport<T>({ ...spec, header: { ...spec.header, ...headers } });
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 401) throw error;
+      return transport<T>(spec);
+    }
+  }
   async function loadAllPages<T>(url: string): Promise<T[]> {
     const items: T[] = [];
     let cursor: string | null = null;
@@ -198,11 +214,22 @@ export function createRealApi(transport: Transport, currentUser: UserProvider, a
       return events.map((item) => mapEvent(item, item.routeId ? routeById.get(item.routeId) : undefined, currentUserId()));
     },
     async getEvent(id) {
-      const event = await transport<BackendEvent>({ url: `/api/v1/events/${id}`, method: 'GET' });
+      const event = await optionalAuthRequest<BackendEvent>({ url: `/api/v1/events/${id}`, method: 'GET' });
       const route = event.routeId
         ? mapRoadbook(await transport<BackendRoadbook>({ url: `/api/v1/routes/${event.routeId}`, method: 'GET' }))
         : undefined;
       return mapEvent(event, route, currentUserId());
+    },
+    async getEventParticipants(eventId) {
+      const result = await optionalAuthRequest<{ items: BackendEventParticipant[] }>({
+        url: `/api/v1/events/${eventId}/participants`, method: 'GET',
+      });
+      return result.items;
+    },
+    async getEventParticipantContact(eventId, contactId) {
+      return protectedRequest<EventParticipantContact>({
+        url: `/api/v1/events/${eventId}/participants/${contactId}/contact`, method: 'GET',
+      });
     },
     async listRoutes() {
       return (await loadRoadbooks()).map(mapRoadbook);
@@ -375,4 +402,5 @@ export const api: ClientApi = USE_MOCK ? {
   bindPhone: async () => ({ id: 'mock-user', nickname: '微信骑友', avatarUrl: null, phoneMasked: '138****8000', city: '' }),
   registerProfile: async (nickname) => ({ id: 'mock-user', nickname, avatarUrl: null, city: '' }),
   register: (eventId, input) => mockApi.register(eventId, input),
+  getEventParticipantContact: async () => ({ nickname: '微信骑友', avatarUrl: null, phone: '138****8000', emergencyContact: '未填写', bikeType: '公路车' }),
 } : realApi;

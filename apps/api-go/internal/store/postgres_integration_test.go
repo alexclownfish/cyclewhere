@@ -23,10 +23,12 @@ func TestPostgresRegistrationIsIdempotentAndDoesNotOversell(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
+	t.Cleanup(pool.Close)
 	repository := NewPostgres(pool)
 	eventID := uuid.NewString()
 	organizerID := uuid.NewString()
+	firstUserID := uuid.NewString()
+	cancelledUserID := uuid.NewString()
 	coverURL := "https://example.com/event-cover.jpg"
 	now := time.Date(2026, 8, 6, 3, 0, 0, 0, time.UTC)
 	event := domain.Event{
@@ -46,9 +48,31 @@ func TestPostgresRegistrationIsIdempotentAndDoesNotOversell(t *testing.T) {
 		_, _ = pool.Exec(ctx, `DELETE FROM registration_idempotency WHERE event_id=$1`, eventID)
 		_, _ = pool.Exec(ctx, `DELETE FROM registrations WHERE event_id=$1`, eventID)
 		_, _ = pool.Exec(ctx, `DELETE FROM events WHERE id=$1`, eventID)
+		_, _ = pool.Exec(ctx, `DELETE FROM user_profiles WHERE id=ANY($1::uuid[])`, []string{organizerID, firstUserID, cancelledUserID})
 	})
 
-	firstCommand := integrationCommand(eventID, uuid.NewString(), "integration-idempotent", now)
+	organizerNickname := "Ride organizer"
+	organizerAvatarURL := "https://example.com/organizer.jpg"
+	if _, err := repository.UpsertUserProfile(ctx, domain.UserProfile{
+		ID: organizerID, Nickname: &organizerNickname, AvatarURL: &organizerAvatarURL, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create organizer profile: %v", err)
+	}
+	firstNickname := "Active rider"
+	firstAvatarURL := "https://example.com/active-rider.jpg"
+	if _, err := repository.UpsertUserProfile(ctx, domain.UserProfile{
+		ID: firstUserID, Nickname: &firstNickname, AvatarURL: &firstAvatarURL, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create active participant profile: %v", err)
+	}
+	cancelledNickname := "Cancelled rider"
+	if _, err := repository.UpsertUserProfile(ctx, domain.UserProfile{
+		ID: cancelledUserID, Nickname: &cancelledNickname, UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create cancelled participant profile: %v", err)
+	}
+
+	firstCommand := integrationCommand(eventID, firstUserID, "integration-idempotent", now)
 	first, err := repository.RegisterAtomically(ctx, firstCommand)
 	if err != nil {
 		t.Fatal(err)
@@ -59,6 +83,37 @@ func TestPostgresRegistrationIsIdempotentAndDoesNotOversell(t *testing.T) {
 	}
 	if first.Replayed || !replay.Replayed || replay.Registration.ID != first.Registration.ID {
 		t.Fatalf("unexpected idempotency results: first=%+v replay=%+v", first, replay)
+	}
+	cancelledCommand := integrationCommand(eventID, cancelledUserID, "integration-cancelled", now)
+	cancelled, err := repository.RegisterAtomically(ctx, cancelledCommand)
+	if err != nil {
+		t.Fatalf("register participant to cancel: %v", err)
+	}
+	if _, err := repository.CancelRegistrationAtomically(ctx, eventID, cancelledUserID, now.Add(time.Minute)); err != nil {
+		t.Fatalf("cancel participant: %v", err)
+	}
+	participants, err := repository.ListEventParticipants(ctx, eventID)
+	if err != nil {
+		t.Fatalf("list event participants: %v", err)
+	}
+	if len(participants) != 2 || !participants[0].IsOrganizer || participants[0].Nickname == nil || *participants[0].Nickname != organizerNickname ||
+		participants[0].AvatarURL == nil || *participants[0].AvatarURL != organizerAvatarURL || participants[1].IsOrganizer ||
+		participants[1].Nickname == nil || *participants[1].Nickname != firstNickname || participants[1].AvatarURL == nil || *participants[1].AvatarURL != firstAvatarURL {
+		t.Fatalf("active participant filtering failed: %+v", participants)
+	}
+	contact, err := repository.GetEventParticipantContact(ctx, eventID, first.Registration.ID)
+	if err != nil {
+		t.Fatalf("get active participant contact: %v", err)
+	}
+	if contact == nil || contact.PhoneEncrypted != firstCommand.PhoneEncrypted || contact.EmergencyContactEncrypted != firstCommand.EmergencyContactEncrypted || contact.BikeType != firstCommand.BikeType {
+		t.Fatalf("active participant contact = %+v", contact)
+	}
+	cancelledContact, err := repository.GetEventParticipantContact(ctx, eventID, cancelled.Registration.ID)
+	if err != nil {
+		t.Fatalf("get cancelled participant contact: %v", err)
+	}
+	if cancelledContact != nil {
+		t.Fatalf("cancelled participant contact should be hidden: %+v", cancelledContact)
 	}
 	registrations, err := repository.ListRegistrationsByUser(ctx, firstCommand.UserID)
 	if err != nil {

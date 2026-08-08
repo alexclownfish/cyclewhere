@@ -111,6 +111,20 @@ type UserRegistration struct {
 	Event        Event        `json:"event"`
 }
 
+type EventParticipant struct {
+	ID          string  `json:"-"`
+	Nickname    *string `json:"nickname"`
+	AvatarURL   *string `json:"avatarUrl"`
+	IsOrganizer bool    `json:"isOrganizer"`
+}
+
+type EventParticipantContact struct {
+	EventParticipant
+	PhoneEncrypted            string
+	EmergencyContactEncrypted string
+	BikeType                  string
+}
+
 type UserProfile struct {
 	ID          string    `json:"id"`
 	Nickname    *string   `json:"nickname"`

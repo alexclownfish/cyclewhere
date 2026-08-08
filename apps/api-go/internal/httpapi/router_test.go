@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -55,6 +56,8 @@ type fakeRepository struct {
 	profileUpserts int
 	phoneUsers     map[string]string
 	phoneMasked    string
+	participants   map[string][]domain.EventParticipant
+	contacts       map[string]*domain.EventParticipantContact
 }
 
 func (f *fakeRepository) GetUserIDByPhoneHash(_ context.Context, phoneHash string) (*string, error) {
@@ -211,6 +214,24 @@ func (*fakeRepository) GetRegistration(context.Context, string, string) (*domain
 
 func (*fakeRepository) ListRegistrationsByUser(context.Context, string) ([]domain.UserRegistration, error) {
 	return []domain.UserRegistration{}, nil
+}
+
+func (f *fakeRepository) ListEventParticipants(_ context.Context, eventID string) ([]domain.EventParticipant, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	items := f.participants[eventID]
+	return append([]domain.EventParticipant(nil), items...), nil
+}
+
+func (f *fakeRepository) GetEventParticipantContact(_ context.Context, eventID, participantID string) (*domain.EventParticipantContact, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	contact := f.contacts[eventID+"\x00"+participantID]
+	if contact == nil {
+		return nil, nil
+	}
+	copy := *contact
+	return &copy, nil
 }
 
 func newContractRouter(t *testing.T, repository *fakeRepository, avatarDir string) (*gin.Engine, *auth.Issuer, *auth.Verifier, *security.FieldEncryptor) {
@@ -424,6 +445,160 @@ func TestEventListUsesEmptyArraysAndMillisecondTimestamps(t *testing.T) {
 			t.Fatalf("abilityRequirements = %#v, want []", event["abilityRequirements"])
 		}
 	})
+}
+
+func TestEventParticipantsExposeOnlyPublicProfileFields(t *testing.T) {
+	const eventID = "11111111-1111-4111-8111-111111111111"
+	nickname := "Rider"
+	avatarURL := "https://api.example.test/api/v1/avatars/rider.jpg"
+	event := contractEvent()
+	event.ID = eventID
+	repository := &fakeRepository{
+		events: []domain.Event{event},
+		participants: map[string][]domain.EventParticipant{
+			eventID: {
+				{Nickname: &nickname, AvatarURL: &avatarURL, IsOrganizer: true},
+				{},
+			},
+		},
+	}
+	router, _, _, _ := newContractRouter(t, repository, t.TempDir())
+	response := perform(router, http.MethodGet, "/api/v1/events/"+eventID+"/participants", "", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	data := nestedObject(t, decodeObject(t, response)["data"], "data")
+	items, ok := data["items"].([]any)
+	if !ok || len(items) != 2 {
+		t.Fatalf("items = %#v", data["items"])
+	}
+	first := nestedObject(t, items[0], "data.items[0]")
+	if len(first) != 3 || first["nickname"] != nickname || first["avatarUrl"] != avatarURL || first["isOrganizer"] != true {
+		t.Fatalf("first participant = %#v", first)
+	}
+	second := nestedObject(t, items[1], "data.items[1]")
+	if len(second) != 3 || second["nickname"] != nil || second["avatarUrl"] != nil || second["isOrganizer"] != false {
+		t.Fatalf("second participant = %#v", second)
+	}
+}
+
+func TestEventDetailUsesOrganizerProfileWithoutExposingOrganizerID(t *testing.T) {
+	nickname := "Ride captain"
+	avatarURL := "https://api.example.test/api/v1/avatars/captain.jpg"
+	event := contractEvent()
+	event.OrganizerID = "organizer-1"
+	repository := &fakeRepository{
+		events:  []domain.Event{event},
+		profile: &domain.UserProfile{ID: event.OrganizerID, Nickname: &nickname, AvatarURL: &avatarURL, UpdatedAt: contractNow},
+	}
+	router, _, _, _ := newContractRouter(t, repository, t.TempDir())
+	response := perform(router, http.MethodGet, "/api/v1/events/"+event.ID, "", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	eventBody := nestedObject(t, decodeObject(t, response)["data"], "data")
+	if _, exists := eventBody["organizerId"]; exists {
+		t.Fatalf("detail leaks organizer ID: %#v", eventBody)
+	}
+	organizer := nestedObject(t, eventBody["organizerProfile"], "data.organizerProfile")
+	if len(organizer) != 2 || organizer["nickname"] != nickname || organizer["avatarUrl"] != avatarURL {
+		t.Fatalf("organizer profile = %#v", organizer)
+	}
+}
+
+func TestOrganizerCanReadRegistrantContactButOtherUsersCannot(t *testing.T) {
+	eventID := "33333333-3333-4333-8333-333333333333"
+	participantID := "44444444-4444-4444-8444-444444444444"
+	event := contractEvent()
+	event.ID = eventID
+	event.OrganizerID = "organizer-1"
+	nickname := "Rider"
+	avatarURL := "https://api.example.test/api/v1/avatars/rider.jpg"
+	repository := &fakeRepository{
+		events: []domain.Event{event},
+		participants: map[string][]domain.EventParticipant{
+			eventID: {
+				{ID: event.OrganizerID, Nickname: &nickname, IsOrganizer: true},
+				{ID: participantID, Nickname: &nickname, AvatarURL: &avatarURL},
+			},
+		},
+		contacts: map[string]*domain.EventParticipantContact{
+			eventID + "\x00" + participantID: {EventParticipant: domain.EventParticipant{ID: participantID, Nickname: &nickname, AvatarURL: &avatarURL}, PhoneEncrypted: "", EmergencyContactEncrypted: "", BikeType: "road"},
+		},
+	}
+	router, issuer, _, encryptor := newContractRouter(t, repository, t.TempDir())
+	phone, err := encryptor.Encrypt("13800138000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	emergency, err := encryptor.Encrypt("Li 13900139000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository.contacts[eventID+"\x00"+participantID].PhoneEncrypted = phone
+	repository.contacts[eventID+"\x00"+participantID].EmergencyContactEncrypted = emergency
+	participantList := perform(router, http.MethodGet, "/api/v1/events/"+eventID+"/participants", "", authHeader(t, issuer, event.OrganizerID))
+	if participantList.Code != http.StatusOK {
+		t.Fatalf("participant list status = %d, body = %s", participantList.Code, participantList.Body.String())
+	}
+	participantItems := nestedObject(t, decodeObject(t, participantList)["data"], "data")["items"].([]any)
+	registrant := nestedObject(t, participantItems[1], "data.items[1]")
+	if registrant["contactId"] != participantID {
+		t.Fatalf("organizer participant contact id = %#v", registrant)
+	}
+	nonOrganizerList := perform(router, http.MethodGet, "/api/v1/events/"+eventID+"/participants", "", authHeader(t, issuer, "rider-2"))
+	if nonOrganizerList.Code != http.StatusOK {
+		t.Fatalf("non-organizer participant list status = %d, body = %s", nonOrganizerList.Code, nonOrganizerList.Body.String())
+	}
+	nonOrganizerItems := nestedObject(t, decodeObject(t, nonOrganizerList)["data"], "data")["items"].([]any)
+	for index, item := range nonOrganizerItems {
+		participant := nestedObject(t, item, fmt.Sprintf("data.items[%d]", index))
+		if _, exists := participant["contactId"]; exists {
+			t.Fatalf("non-organizer participant list leaks contact id: %#v", participant)
+		}
+	}
+
+	path := "/api/v1/events/" + eventID + "/participants/" + participantID + "/contact"
+	response := perform(router, http.MethodGet, path, "", authHeader(t, issuer, event.OrganizerID))
+	if response.Code != http.StatusOK {
+		t.Fatalf("organizer status = %d, body = %s", response.Code, response.Body.String())
+	}
+	contact := nestedObject(t, decodeObject(t, response)["data"], "data")
+	if contact["phone"] != "13800138000" || contact["emergencyContact"] != "Li 13900139000" || contact["bikeType"] != "road" || contact["nickname"] != nickname || contact["avatarUrl"] != avatarURL {
+		t.Fatalf("contact = %#v", contact)
+	}
+	if _, exists := contact["id"]; exists || strings.Contains(response.Body.String(), participantID) {
+		t.Fatalf("contact response leaks internal ID: %s", response.Body.String())
+	}
+	forbidden := perform(router, http.MethodGet, path, "", authHeader(t, issuer, "rider-2"))
+	if forbidden.Code != http.StatusForbidden {
+		t.Fatalf("non-organizer status = %d, body = %s", forbidden.Code, forbidden.Body.String())
+	}
+}
+
+func TestEventParticipantsHideNonPublicEvents(t *testing.T) {
+	const eventID = "22222222-2222-4222-8222-222222222222"
+	draft := contractEvent()
+	draft.ID = eventID
+	draft.Status = domain.EventDraft
+	repository := &fakeRepository{
+		events:       []domain.Event{draft},
+		participants: map[string][]domain.EventParticipant{eventID: {{}}},
+	}
+	router, _, _, _ := newContractRouter(t, repository, t.TempDir())
+	response := perform(router, http.MethodGet, "/api/v1/events/"+eventID+"/participants", "", "")
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+}
+
+func TestEventParticipantsRejectInvalidEventID(t *testing.T) {
+	repository := &fakeRepository{}
+	router, _, _, _ := newContractRouter(t, repository, t.TempDir())
+	response := perform(router, http.MethodGet, "/api/v1/events/not-a-uuid/participants", "", "")
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
 }
 
 func TestOptionalAuthRejectsInvalidToken(t *testing.T) {

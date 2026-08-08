@@ -1,6 +1,6 @@
-import type { MyRegistrationRecord, PublishEventInput, Registration, RegistrationInput, RideEvent, RideRoute } from '../types/domain.ts';
-import { canRegister } from '../utils/domain.ts';
-import { events as seedEvents, initialRegistrations, routes } from './mock-data.ts';
+import type { EventParticipant, EventParticipantContact, MyRegistrationRecord, PublishEventInput, Registration, RegistrationInput, RideEvent, RideRoute, UserProfile } from '../types/domain';
+import { canRegister } from '../utils/domain';
+import { events as seedEvents, initialRegistrations, routes } from './mock-data';
 
 const EVENT_KEY = 'ride_demo_events_v1';
 const REGISTRATION_KEY = 'ride_demo_registrations_v1';
@@ -22,6 +22,25 @@ export const mockApi = {
     const item = loadEvents().find((event) => event.id === id);
     if (!item) throw new Error('活动不存在或已下架');
     return delay(item);
+  },
+  async getEventParticipants(eventId: string): Promise<EventParticipant[]> {
+    const event = loadEvents().find((item) => item.id === eventId);
+    if (!event) throw new Error('活动不存在或已下架');
+    const account = wx.getStorageSync('demo_account') || {};
+    const profile = wx.getStorageSync('demo_profile') || {};
+    const participants: EventParticipant[] = [{
+      nickname: event.organizer || '活动组织者', avatarUrl: event.organizerAvatarUrl || null, isOrganizer: true,
+    }];
+    const hasActiveRegistration = loadRegistrations().some((item) => item.eventId === eventId && item.status !== 'cancelled');
+    if (hasActiveRegistration && !event.ownedByMe) participants.push({
+      nickname: profile.nickname || account.nickname || '微信骑友',
+      avatarUrl: profile.avatarUrl || account.avatarUrl || null, isOrganizer: false, contactId: 'mock-contact',
+    });
+    return delay(participants);
+  },
+  async getEventParticipantContact(): Promise<EventParticipantContact> {
+    const profile = wx.getStorageSync('demo_profile') || {};
+    return delay({ nickname: profile.nickname || '微信骑友', avatarUrl: profile.avatarUrl || null, phone: '138****8000', emergencyContact: '未填写', bikeType: '公路车' });
   },
   async listRoutes(): Promise<RideRoute[]> { return delay(routes); },
   async getRoute(id: string): Promise<RideRoute> {
@@ -88,5 +107,26 @@ export const mockApi = {
     allEvents.unshift(event);
     saveEvents(allEvents);
     return delay(event);
+  },
+  async updateEvent(id: string, input: PublishEventInput): Promise<RideEvent> {
+    const allEvents = loadEvents();
+    const event = allEvents.find((item) => item.id === id);
+    if (!event) throw new Error('娲诲姩涓嶅瓨鍦');
+    const route = routes.find((item) => item.id === input.routeId) || routes[1];
+    Object.assign(event, { title: input.title, startAt: `${input.date}T${input.time}:00+08:00`, meetingPoint: input.meetingPoint, routeId: route.id, route, capacity: input.capacity, speedRange: input.speedRange, description: input.description, requirements: input.requirements });
+    saveEvents(allEvents);
+    return delay(event);
+  },
+  async getProfile(): Promise<UserProfile | null> {
+    return delay(wx.getStorageSync('demo_profile') || null);
+  },
+  async updateProfile(profile: Omit<UserProfile, 'id'>): Promise<UserProfile> {
+    const result = { id: (wx.getStorageSync('demo_account') || {}).id || 'demo-user', ...profile } as UserProfile;
+    wx.setStorageSync('demo_profile', result);
+    wx.setStorageSync('demo_account', { ...wx.getStorageSync('demo_account'), ...result });
+    return delay(result);
+  },
+  async importGpx(): Promise<RideRoute> {
+    throw new Error('Mock 模式暂不支持 GPX 导入，请切换真实 API');
   },
 };

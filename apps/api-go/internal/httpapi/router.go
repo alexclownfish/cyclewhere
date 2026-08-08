@@ -24,6 +24,7 @@ import (
 	"cyclewhere/api-go/internal/security"
 	"cyclewhere/api-go/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 const (
@@ -106,11 +107,13 @@ func NewRouter(deps Dependencies) (*gin.Engine, error) {
 	v1.GET("/event-covers/:fileName", api.getEventCover)
 	v1.GET("/events", api.listEvents)
 	v1.GET("/events/:id", api.optionalAuth(), api.getEvent)
+	v1.GET("/events/:id/participants", api.optionalAuth(), api.listEventParticipants)
+	protected := v1.Group("")
+	protected.Use(api.requireAuth())
+	protected.GET("/events/:id/participants/:participantId/contact", api.getEventParticipantContact)
 	v1.GET("/routes", api.listRoadbooks)
 	v1.GET("/routes/:id", api.getRoadbook)
 
-	protected := v1.Group("")
-	protected.Use(api.requireAuth())
 	protected.GET("/me/profile", api.getProfile)
 	protected.PUT("/me/profile", api.updateProfile)
 	protected.POST("/me/phone", api.bindPhone)
@@ -855,7 +858,79 @@ func (a *API) getEvent(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, data(eventResponse(*event)))
+	organizer, err := a.repository.GetUserProfile(c.Request.Context(), event.OrganizerID)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, data(eventDetailResponse(*event, organizer, userID(c) != "" && event.OrganizerID == userID(c))))
+}
+
+func (a *API) listEventParticipants(c *gin.Context) {
+	if uuid.Validate(strings.TrimSpace(c.Param("id"))) != nil {
+		writeValidation(c)
+		return
+	}
+	event, err := a.catalog.GetPublicEvent(c.Request.Context(), c.Param("id"), userID(c))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	participants, err := a.repository.ListEventParticipants(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	items := make([]any, len(participants))
+	includeContactIDs := userID(c) != "" && userID(c) == event.OrganizerID
+	for index, participant := range participants {
+		item := participantResponse(participant)
+		if includeContactIDs && !participant.IsOrganizer {
+			item["contactId"] = participant.ID
+		}
+		items[index] = item
+	}
+	c.JSON(http.StatusOK, data(gin.H{"items": items}))
+}
+
+func (a *API) getEventParticipantContact(c *gin.Context) {
+	if uuid.Validate(strings.TrimSpace(c.Param("id"))) != nil || uuid.Validate(strings.TrimSpace(c.Param("participantId"))) != nil {
+		writeValidation(c)
+		return
+	}
+	event, err := a.catalog.GetEvent(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	if event == nil {
+		writeError(c, domain.NotFound("娲诲姩"))
+		return
+	}
+	if event.OrganizerID != userID(c) {
+		writeError(c, domain.Forbidden("仅活动组织者可以查看报名联系方式"))
+		return
+	}
+	contact, err := a.repository.GetEventParticipantContact(c.Request.Context(), c.Param("id"), c.Param("participantId"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	if contact == nil {
+		writeError(c, domain.NotFound("报名骑友"))
+		return
+	}
+	phone, err := a.encryptor.Decrypt(contact.PhoneEncrypted)
+	if err != nil {
+		writeError(c, domain.NewError("CONTACT_UNAVAILABLE", "报名联系方式暂不可用", http.StatusInternalServerError))
+		return
+	}
+	emergencyContact, err := a.encryptor.Decrypt(contact.EmergencyContactEncrypted)
+	if err != nil {
+		writeError(c, domain.NewError("CONTACT_UNAVAILABLE", "报名联系方式暂不可用", http.StatusInternalServerError))
+		return
+	}
+	c.JSON(http.StatusOK, data(participantContactResponse(*contact, phone, emergencyContact)))
 }
 
 func (a *API) createEvent(c *gin.Context) {

@@ -6,11 +6,13 @@ export type BackendEventStatus = 'draft' | 'published' | 'full' | 'completed' | 
 
 export interface BackendPage<T> { items: T[]; nextCursor: string | null; }
 export interface BackendEvent {
-  id: string; organizerId: string; routeId: string | null; title: string; summary: string; coverUrl?: string | null; startAt: string;
+  id: string; organizerId?: string; routeId: string | null; title: string; summary: string; coverUrl?: string | null; startAt: string;
   registrationDeadline: string; meetingPoint: string; difficulty: BackendDifficulty; distanceKm: number;
   elevationGainM: number; speedMinKph: number; speedMaxKph: number; capacity: number; registrationCount: number;
   equipmentRequirements: string[]; abilityRequirements: string[]; safetyNotice: string; status: BackendEventStatus;
   createdAt: string; updatedAt: string; version: number;
+  organizerProfile?: { nickname: string | null; avatarUrl: string | null } | null;
+  ownedByMe?: boolean;
 }
 export interface BackendWaypoint {
   name: string; type: 'start' | 'finish' | 'water' | 'supply' | 'danger' | 'viewpoint';
@@ -29,6 +31,12 @@ export interface BackendRegistration {
 }
 export interface BackendRegistrationResult { registration: BackendRegistration; event: BackendEvent; replayed: boolean; }
 export interface BackendUserRegistration { registration: BackendRegistration; event: BackendEvent; }
+export interface BackendEventParticipant {
+  nickname: string | null;
+  avatarUrl: string | null;
+  isOrganizer: boolean;
+  contactId?: string;
+}
 export interface CreateBackendEvent {
   routeId: string | null; title: string; summary: string; startAt: string; registrationDeadline: string;
   meetingPoint: string; difficulty: BackendDifficulty; distanceKm: number; elevationGainM: number;
@@ -74,7 +82,9 @@ export function fallbackRoute(event: BackendEvent): RideRoute {
 
 export function mapEvent(event: BackendEvent, route: RideRoute | undefined, currentUserId: string): RideEvent {
   return {
-    id: event.id, title: event.title, coverUrl: event.coverUrl || null, organizer: event.organizerId, startAt: event.startAt, registrationDeadline: event.registrationDeadline, meetingPoint: event.meetingPoint,
+    id: event.id, title: event.title, coverUrl: event.coverUrl || null,
+    organizer: event.organizerProfile?.nickname || '活动组织者', organizerAvatarUrl: event.organizerProfile?.avatarUrl || null,
+    startAt: event.startAt, registrationDeadline: event.registrationDeadline, meetingPoint: event.meetingPoint,
     routeId: event.routeId || '', route: route || fallbackRoute(event), capacity: event.capacity,
     registeredCount: event.registrationCount, speedRange: `${event.speedMinKph}-${event.speedMaxKph} km/h`,
     status: event.status === 'draft' ? 'published' : event.status, approvalRequired: false,
@@ -84,7 +94,7 @@ export function mapEvent(event: BackendEvent, route: RideRoute | undefined, curr
       recentElevationM: abilityNumber(event.abilityRequirements, '爬升'), bikeTypes: ['公路车'],
       disciplines: [event.safetyNotice], customNote: event.abilityRequirements.join('；'),
     },
-    ownedByMe: Boolean(currentUserId) && event.organizerId === currentUserId,
+    ownedByMe: event.ownedByMe ?? (Boolean(currentUserId) && event.organizerId === currentUserId),
   };
 }
 

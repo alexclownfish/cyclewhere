@@ -2,13 +2,11 @@
   "compilerOptions": {
     "strict": true,
     "target": "ES2020",
-    "module": "ESNext",
+    "module": "commonjs",
     "moduleResolution": "Node",
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "types": ["miniprogram-api-typings", "node"]
   },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": ["app.ts", "config/**/*.ts", "pages/**/*.ts", "services/**/*.ts", "types/**/*.ts", "utils/**/*.ts"],
+  "exclude": ["node_modules", "tests"]
 }

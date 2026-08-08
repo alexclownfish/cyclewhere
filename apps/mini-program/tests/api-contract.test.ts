@@ -150,6 +150,35 @@ test('public event detail remains available when login is unavailable', async ()
   assert.deepEqual(calls, ['/api/v1/events/event-1', '/api/v1/routes/route-1']);
 });
 
+test('public participant list exposes only rider identity fields without authentication', async () => {
+  const calls: RequestSpec[] = [];
+  const items = [
+    { nickname: '骑行小明', avatarUrl: 'https://cyclewhereapi.alexcld.com/api/v1/avatars/rider-1.jpg', isOrganizer: true },
+    { nickname: null, avatarUrl: null, isOrganizer: false },
+  ];
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    calls.push(spec);
+    return { items } as T;
+  };
+  const participants = await createRealApi(transport, 'user-1', auth).getEventParticipants('event-1');
+  assert.deepEqual(participants, items);
+  assert.equal(calls[0].url, '/api/v1/events/event-1/participants');
+  assert.equal(calls[0].method, 'GET');
+  assert.equal(calls[0].header?.Authorization, 'Bearer verified-test-token');
+});
+
+test('organizer contact adapter uses the protected event participant endpoint', async () => {
+  const calls: RequestSpec[] = [];
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    calls.push(spec);
+    return { nickname: '骑行小明', avatarUrl: null, phone: '13800138000', emergencyContact: '林先生 13600001048', bikeType: '公路车' } as T;
+  };
+  const contact = await createRealApi(transport, 'organizer-demo', auth).getEventParticipantContact('event-1', 'contact-1');
+  assert.equal(contact.phone, '13800138000');
+  assert.equal(calls[0].url, '/api/v1/events/event-1/participants/contact-1/contact');
+  assert.equal(calls[0].header?.Authorization, 'Bearer verified-test-token');
+});
+
 test('protected request refreshes a rejected bearer token once', async () => {
   const refreshFlags: Array<boolean | undefined> = [];
   let requestCount = 0;
