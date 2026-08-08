@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const api_1 = require("../../services/api");
 const domain_1 = require("../../utils/domain");
 const presentation_1 = require("../../utils/presentation");
+const apple_modal_1 = require("../../utils/apple-modal");
 const PENDING_EDIT_KEY = 'pending_edit_event_id';
 const RECENT_MEETING_POINTS_KEY = 'fengji_recent_meeting_points_v1';
 Page({
@@ -11,6 +12,7 @@ Page({
         locationSuggestions: [], showLocationSuggestions: false,
         difficultyOptions: ['轻松', '中等', '进阶'], difficultyIndex: 1,
         coverPreview: '',
+        appleModal: { visible: false, title: '', content: '', showCancel: true, cancelText: '取消', confirmText: '好', destructive: false },
         authChecking: true, authReady: false, authError: '', routesError: '',
         form: {
             title: '', date: '2026-08-15', time: '06:30', meetingPoint: '',
@@ -136,6 +138,8 @@ Page({
         });
     },
     hideLocationSuggestions() { setTimeout(() => this.setData({ showLocationSuggestions: false }), 160); },
+    noop() { },
+    resolveAppleModal(event) { (0, apple_modal_1.resolveAppleModal)(this, String(event.currentTarget.dataset.confirm) === 'true'); },
     resetForNewEvent() {
         const now = new Date();
         const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -223,7 +227,7 @@ Page({
                 await api_1.api.updateEvent(this.data.editingId, this.data.form);
             else
                 await api_1.api.publish(this.data.form);
-            await wx.showModal({
+            await (0, apple_modal_1.openAppleModal)(this, {
                 title: editing ? '活动已更新' : '活动已发布',
                 content: editing ? '修改内容已保存。' : '活动已进入公开列表，可在“我的活动”中继续管理。',
                 showCancel: false,
@@ -233,7 +237,7 @@ Page({
             wx.switchTab({ url: '/pages/mine/index' });
         }
         catch (error) {
-            await wx.showModal({ title: this.data.editingId ? '保存失败' : '发布失败', content: (0, presentation_1.errorMessage)(error), showCancel: false, confirmText: '知道了' });
+            await (0, apple_modal_1.openAppleModal)(this, { title: this.data.editingId ? '保存失败' : '发布失败', content: (0, presentation_1.errorMessage)(error), showCancel: false, confirmText: '知道了' });
         }
         finally {
             this.setData({ submitting: false });

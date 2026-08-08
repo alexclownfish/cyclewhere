@@ -2,6 +2,7 @@ import { api } from '../../services/api';
 import type { PublishEventInput, RideRoute } from '../../types/domain';
 import { validatePublish } from '../../utils/domain';
 import { errorMessage } from '../../utils/presentation';
+import { openAppleModal, resolveAppleModal as completeAppleModal, type AppleModalState } from '../../utils/apple-modal';
 
 interface SelectOption { label: string; selected: boolean; }
 interface RouteOption { name: string; route: RideRoute | null; }
@@ -16,6 +17,7 @@ Page({
     locationSuggestions: [] as LocationSuggestion[], showLocationSuggestions: false,
     difficultyOptions: ['轻松', '中等', '进阶'] as RideRoute['difficulty'][], difficultyIndex: 1,
     coverPreview: '',
+    appleModal: { visible: false, title: '', content: '', showCancel: true, cancelText: '取消', confirmText: '好', destructive: false } as AppleModalState,
     authChecking: true, authReady: false, authError: '', routesError: '',
     form: {
       title: '', date: '2026-08-15', time: '06:30', meetingPoint: '',
@@ -125,6 +127,8 @@ Page({
     });
   },
   hideLocationSuggestions() { setTimeout(() => this.setData({ showLocationSuggestions: false }), 160); },
+  noop() {},
+  resolveAppleModal(event: WechatMiniprogram.TouchEvent) { completeAppleModal(this, String(event.currentTarget.dataset.confirm) === 'true'); },
   resetForNewEvent() {
     const now = new Date();
     const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -198,7 +202,7 @@ Page({
       const editing = Boolean(this.data.editingId);
       if (editing) await api.updateEvent(this.data.editingId, this.data.form);
       else await api.publish(this.data.form);
-      await wx.showModal({
+      await openAppleModal(this, {
         title: editing ? '活动已更新' : '活动已发布',
         content: editing ? '修改内容已保存。' : '活动已进入公开列表，可在“我的活动”中继续管理。',
         showCancel: false,
@@ -207,7 +211,7 @@ Page({
       this.resetForNewEvent();
       wx.switchTab({ url: '/pages/mine/index' });
     } catch (error) {
-      await wx.showModal({ title: this.data.editingId ? '保存失败' : '发布失败', content: errorMessage(error), showCancel: false, confirmText: '知道了' });
+      await openAppleModal(this, { title: this.data.editingId ? '保存失败' : '发布失败', content: errorMessage(error), showCancel: false, confirmText: '知道了' });
     }
     finally { this.setData({ submitting: false }); }
   },

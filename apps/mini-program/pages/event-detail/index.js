@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const api_1 = require("../../services/api");
 const domain_1 = require("../../utils/domain");
 const presentation_1 = require("../../utils/presentation");
+const apple_modal_1 = require("../../utils/apple-modal");
 function presentParticipants(items) {
     return items.map((item, key) => {
         const displayName = item.nickname?.trim() || '微信骑友';
@@ -16,10 +17,13 @@ Page({
         canRegisterNow: false, actionText: '报名参加', cancelling: false, eventCancelling: false,
         participants: [], participantsLoading: false, participantsError: '',
         participantLoadGeneration: 0,
+        appleModal: { visible: false, title: '', content: '', showCancel: true, cancelText: '取消', confirmText: '好', destructive: false },
     },
     onLoad(options) { this.setData({ id: options.id || 'event-miaofeng' }); },
     onShow() { if (this.data.id)
         this.loadDetail(); },
+    noop() { },
+    resolveAppleModal(event) { (0, apple_modal_1.resolveAppleModal)(this, String(event.currentTarget.dataset.confirm) === 'true'); },
     async loadDetail() {
         const participantLoadGeneration = this.data.participantLoadGeneration + 1;
         this.setData({ loading: true, error: '', participantsLoading: true, participantsError: '', participantLoadGeneration });
@@ -76,7 +80,7 @@ Page({
         this.setData({ participants: this.data.participants.map((item) => item.key === participant.key ? { ...item, contactLoading: true } : item) });
         try {
             const contact = await api_1.api.getEventParticipantContact(this.data.id, participant.contactId);
-            await wx.showModal({
+            await (0, apple_modal_1.openAppleModal)(this, {
                 title: contact.nickname || participant.displayName,
                 content: `手机号：${contact.phone}\n紧急联系人：${contact.emergencyContact}\n车型：${contact.bikeType}`,
                 showCancel: false,
@@ -107,11 +111,11 @@ Page({
     async cancelEvent() {
         if (!this.data.event?.ownedByMe || (this.data.event.status !== 'published' && this.data.event.status !== 'full'))
             return;
-        const result = await wx.showModal({
+        const result = await (0, apple_modal_1.openAppleModal)(this, {
             title: '确认取消活动？',
             content: '取消后活动将停止报名并从公开活动中下架，此操作不可恢复。',
             confirmText: '取消活动',
-            confirmColor: '#d9433b',
+            destructive: true,
         });
         if (!result.confirm)
             return;
@@ -129,7 +133,7 @@ Page({
         }
     },
     async cancelRegistration() {
-        const result = await wx.showModal({ title: '确认取消报名？', content: '取消后名额将立即释放，请确认行程后操作。', confirmColor: '#d9433b' });
+        const result = await (0, apple_modal_1.openAppleModal)(this, { title: '确认取消报名？', content: '取消后名额将立即释放，请确认行程后操作。', destructive: true });
         if (!result.confirm)
             return;
         this.setData({ cancelling: true });

@@ -2,18 +2,22 @@ import { api } from '../../services/api';
 import type { RegistrationInput, RideEvent } from '../../types/domain';
 import { makeIdempotencyKey, validateRegistration } from '../../utils/domain';
 import { errorMessage, formatRideDate } from '../../utils/presentation';
+import { openAppleModal, resolveAppleModal as completeAppleModal, type AppleModalState } from '../../utils/apple-modal';
 
 Page({
   data: {
     eventId: '', intentKey: '', event: null as RideEvent | null, loading: true, submitting: false, success: false, successCopy: '', dateText: '',
     bikeTypes: ['公路车', '砾石车', '山地车'], bikeIndex: 0,
     form: { phone: '', emergencyContact: '', bikeType: '公路车', abilityConfirmed: false, waiverConfirmed: false } as RegistrationInput,
+    appleModal: { visible: false, title: '', content: '', showCancel: true, cancelText: '取消', confirmText: '好', destructive: false } as AppleModalState,
   },
   onLoad(options: Record<string, string>) {
     const eventId = options.eventId || '';
     this.setData({ eventId, intentKey: makeIdempotencyKey(eventId) });
     this.loadEvent();
   },
+  noop() {},
+  resolveAppleModal(event: WechatMiniprogram.TouchEvent) { completeAppleModal(this, String(event.currentTarget.dataset.confirm) === 'true'); },
   async loadEvent() {
     try {
       const event = await api.getEvent(this.data.eventId);
@@ -31,6 +35,11 @@ Page({
   },
   async submit() {
     if (this.data.submitting) return;
+    if (!wx.getStorageSync('auth_token')) {
+      const result = await openAppleModal(this, { title: '请先登录', content: '授权微信头像和昵称后即完成注册，随后可继续报名。', confirmText: '去登录' });
+      if (result.confirm) wx.switchTab({ url: '/pages/mine/index' });
+      return;
+    }
     const validation = validateRegistration(this.data.form);
     if (!validation.valid) return wx.showToast({ title: validation.message, icon: 'none' });
     this.setData({ submitting: true });

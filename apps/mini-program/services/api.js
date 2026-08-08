@@ -11,10 +11,11 @@ function normalizeRequestSpec(spec) {
     return ['POST', 'PUT'].includes(spec.method) && spec.data === undefined ? { ...spec, data: {} } : spec;
 }
 class ApiError extends Error {
-    constructor(message, statusCode, code) {
+    constructor(message, statusCode, code, details) {
         super(message);
         this.statusCode = statusCode;
         this.code = code;
+        this.details = details;
         this.name = 'ApiError';
     }
 }
@@ -31,7 +32,7 @@ function wxTransport(spec) {
                     resolve(response.data.data);
                 else {
                     const payload = response.data;
-                    reject(new ApiError(payload.error?.message || `请求失败（${response.statusCode}）`, response.statusCode, payload.error?.code || 'HTTP_ERROR'));
+                    reject(new ApiError(payload.error?.message || `请求失败（${response.statusCode}）`, response.statusCode, payload.error?.code || 'HTTP_ERROR', payload.error?.details));
                 }
             },
             fail: (error) => {

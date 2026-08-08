@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import type { EventParticipant } from '../types/domain.ts';
 
 const { api } = await import('../services/api.ts');
+const { resolveAppleModal } = await import('../utils/apple-modal.ts');
 let definition: any;
 (globalThis as any).Page = (value: any) => { definition = value; };
 await import('../pages/event-detail/index.ts');
@@ -11,7 +12,7 @@ function createPage() {
   return {
     ...definition,
     data: structuredClone(definition.data),
-    setData(update: Record<string, unknown>) { Object.assign(this.data, update); },
+    setData(update: Record<string, unknown>, callback?: () => void) { Object.assign(this.data, update); callback?.(); },
   };
 }
 
@@ -40,24 +41,23 @@ test('a stale participant response cannot restore a rider after a newer refresh'
 test('only the organizer can open a rider contact from the participant grid', async () => {
   const original = api.getEventParticipantContact;
   let requestedContact = '';
-  let modalContent = '';
   api.getEventParticipantContact = async (_eventId, contactId) => {
     requestedContact = contactId;
     return { nickname: '骑行小明', avatarUrl: null, phone: '13800138000', emergencyContact: '林先生 13600001048', bikeType: '公路车' };
   };
-  (globalThis as any).wx = {
-    showModal: async (options: { content: string }) => { modalContent = options.content; return { confirm: true, cancel: false }; },
-    showToast: () => undefined,
-  };
+  (globalThis as any).wx = { showToast: () => undefined };
 
   try {
     const page = createPage();
     page.data.id = '11111111-1111-4111-8111-111111111111';
     page.data.event = { ownedByMe: true };
     page.data.participants = [{ key: 0, nickname: '骑行小明', avatarUrl: null, isOrganizer: false, contactId: 'contact-1', displayName: '骑行小明', avatarText: '骑' }];
-    await page.openParticipant({ currentTarget: { dataset: { participantIndex: 0 } } });
+    const contactRequest = page.openParticipant({ currentTarget: { dataset: { participantIndex: 0 } } });
+    await Promise.resolve();
+    resolveAppleModal(page, true);
+    await contactRequest;
     assert.equal(requestedContact, 'contact-1');
-    assert.match(modalContent, /13800138000/);
+    assert.match(page.data.appleModal.content, /13800138000/);
 
     requestedContact = '';
     page.data.event = { ownedByMe: false };
@@ -75,7 +75,6 @@ test('organizer can cancel an active event and jump to the participant list', as
   let scrollSelector = '';
   api.cancelEvent = async (eventId) => { cancelledEvent = eventId; };
   (globalThis as any).wx = {
-    showModal: async () => ({ confirm: true, cancel: false }),
     showToast: () => undefined,
     pageScrollTo: ({ selector }: { selector: string }) => { scrollSelector = selector; },
   };
@@ -85,7 +84,10 @@ test('organizer can cancel an active event and jump to the participant list', as
     page.data.id = '11111111-1111-4111-8111-111111111111';
     page.data.event = { ownedByMe: true, status: 'published' };
     page.loadDetail = async () => { reloaded += 1; };
-    await page.cancelEvent();
+    const cancelRequest = page.cancelEvent();
+    await Promise.resolve();
+    resolveAppleModal(page, true);
+    await cancelRequest;
     assert.equal(cancelledEvent, page.data.id);
     assert.equal(reloaded, 1);
     assert.equal(page.data.eventCancelling, false);

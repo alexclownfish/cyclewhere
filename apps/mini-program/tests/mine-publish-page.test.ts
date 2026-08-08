@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { api } from '../services/api';
+import { resolveAppleModal } from '../utils/apple-modal';
 
 let mineDefinition: any;
 (globalThis as any).Page = (value: any) => { mineDefinition = value; };
@@ -67,12 +68,10 @@ test('submitting an edit resets the page so the next submit creates a new event'
   const calls: string[] = [];
   const originalUpdate = api.updateEvent;
   const originalPublish = api.publish;
-  const originalModal = (globalThis as any).wx?.showModal;
   const originalSwitchTab = (globalThis as any).wx?.switchTab;
   (api as any).updateEvent = async () => { calls.push('update'); return {}; };
   (api as any).publish = async () => { calls.push('publish'); return {}; };
   (globalThis as any).wx = {
-    showModal: async () => ({ confirm: true }),
     showToast: () => undefined,
     switchTab: () => undefined,
   };
@@ -100,7 +99,10 @@ test('submitting an edit resets the page so the next submit creates a new event'
   };
 
   try {
-    await page.submit();
+    const editRequest = page.submit();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    resolveAppleModal(page, true);
+    await editRequest;
     assert.deepEqual(calls, ['update']);
     assert.equal(page.data.editingId, '');
     assert.equal(page.data.form.title, '');
@@ -109,12 +111,14 @@ test('submitting an edit resets the page so the next submit creates a new event'
     page.data.form.meetingPoint = 'Another start point';
     page.data.form.description = 'A new safe group ride with clear rules.';
     page.data.form.distanceKm = 60;
-    await page.submit();
+    const publishRequest = page.submit();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    resolveAppleModal(page, true);
+    await publishRequest;
     assert.deepEqual(calls, ['update', 'publish']);
   } finally {
     (api as any).updateEvent = originalUpdate;
     (api as any).publish = originalPublish;
-    if (originalModal) (globalThis as any).wx.showModal = originalModal;
     if (originalSwitchTab) (globalThis as any).wx.switchTab = originalSwitchTab;
   }
 });

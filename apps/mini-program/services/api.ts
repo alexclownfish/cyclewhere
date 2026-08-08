@@ -20,7 +20,7 @@ export function normalizeRequestSpec(spec: RequestSpec): RequestSpec {
 }
 
 export class ApiError extends Error {
-  constructor(message: string, readonly statusCode: number, readonly code: string) {
+  constructor(message: string, readonly statusCode: number, readonly code: string, readonly details?: unknown) {
     super(message);
     this.name = 'ApiError';
   }
@@ -59,8 +59,8 @@ function wxTransport<T>(spec: RequestSpec): Promise<T> {
       success(response) {
         if (response.statusCode >= 200 && response.statusCode < 300) resolve(response.data.data);
         else {
-          const payload = response.data as unknown as { error?: { code?: string; message?: string } };
-          reject(new ApiError(payload.error?.message || `请求失败（${response.statusCode}）`, response.statusCode, payload.error?.code || 'HTTP_ERROR'));
+          const payload = response.data as unknown as { error?: { code?: string; message?: string; details?: unknown } };
+          reject(new ApiError(payload.error?.message || `请求失败（${response.statusCode}）`, response.statusCode, payload.error?.code || 'HTTP_ERROR', payload.error?.details));
         }
       },
       fail: (error) => {

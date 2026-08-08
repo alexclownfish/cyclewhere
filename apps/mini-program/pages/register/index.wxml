@@ -1,24 +1,47 @@
 <view class="page register-page">
   <view wx:if="{{loading}}" class="loading"><text class="loading-dot"></text>正在确认活动名额</view>
+
   <view wx:elif="{{success}}" class="success-state">
-    <view class="success-mark">✓</view><view class="success-title">报名已提交</view>
+    <view class="success-halo"><view class="success-mark">✓</view></view>
+    <view class="success-kicker">报名成功</view>
+    <view class="success-title">报名已提交</view>
     <view class="success-copy">{{successCopy}}</view>
     <button class="button button-dark" bindtap="goMine">查看我的活动</button>
   </view>
+
   <block wx:elif="{{event}}">
-    <view class="event-brief"><text class="badge badge-red">确认报名</text><view class="brief-title">{{event.title}}</view><view class="meta">{{dateText}}</view><view class="meta">{{event.meetingPoint}}</view></view>
-    <view class="form-section">
-      <view class="form-title">联系与车辆</view>
+    <view class="event-brief">
+      <view class="brief-top"><text class="badge badge-green">确认报名</text><view class="brief-status"><text></text>名额可用</view></view>
+      <view class="brief-title">{{event.title}}</view>
+      <view class="brief-meta"><view class="meta-icon">日</view><view>{{dateText}}</view></view>
+      <view class="brief-meta"><view class="meta-icon">点</view><view>{{event.meetingPoint}}</view></view>
+    </view>
+
+    <view class="form-section first-section">
+      <view class="section-head"><view class="section-index">01</view><view><view class="form-title">联系与车辆</view><view class="section-copy">仅用于本次活动的必要联系</view></view></view>
       <view class="field"><label class="label required">联系电话</label><input class="input" type="number" maxlength="11" value="{{form.phone}}" data-field="phone" bindinput="onField" /></view>
       <view class="field"><label class="label required">紧急联系人及电话</label><input class="input" value="{{form.emergencyContact}}" data-field="emergencyContact" bindinput="onField" /></view>
-      <view class="field"><label class="label required">车辆类型</label><picker range="{{bikeTypes}}" value="{{bikeIndex}}" bindchange="chooseBike"><view class="picker"><text>{{form.bikeType}}</text><text>›</text></view></picker></view>
+      <view class="field"><label class="label required">车辆类型</label><picker range="{{bikeTypes}}" value="{{bikeIndex}}" bindchange="chooseBike"><view class="picker"><text>{{form.bikeType}}</text><text class="chevron">›</text></view></picker></view>
     </view>
+
     <view class="form-section">
-      <view class="form-title">出发前确认</view>
-      <view class="confirm {{form.abilityConfirmed ? 'confirm-on' : ''}}" data-field="abilityConfirmed" bindtap="toggleConfirm"><view class="confirm-box">{{form.abilityConfirmed ? '✓' : ''}}</view><view>我确认近期骑行能力符合活动要求，并会携带全部必备装备。</view></view>
-      <view class="confirm {{form.waiverConfirmed ? 'confirm-on' : ''}}" data-field="waiverConfirmed" bindtap="toggleConfirm"><view class="confirm-box">{{form.waiverConfirmed ? '✓' : ''}}</view><view>我已阅读活动风险说明、取消规则和个人信息使用说明，并同意按队伍纪律骑行。</view></view>
-      <view class="privacy">联系电话仅用于本次活动联系，结束后将按平台策略脱敏或删除。</view>
+      <view class="section-head"><view class="section-index">02</view><view><view class="form-title">出发前确认</view><view class="section-copy">确认能力、装备与风险说明</view></view></view>
+      <view class="confirm {{form.abilityConfirmed ? 'confirm-on' : ''}}" data-field="abilityConfirmed" bindtap="toggleConfirm"><view class="confirm-box">{{form.abilityConfirmed ? '✓' : ''}}</view><view class="confirm-copy"><view class="confirm-title">能力与装备</view><view>我确认近期骑行能力符合活动要求，并会携带全部必备装备。</view></view></view>
+      <view class="confirm {{form.waiverConfirmed ? 'confirm-on' : ''}}" data-field="waiverConfirmed" bindtap="toggleConfirm"><view class="confirm-box">{{form.waiverConfirmed ? '✓' : ''}}</view><view class="confirm-copy"><view class="confirm-title">风险与纪律</view><view>我已阅读活动风险说明、取消规则和个人信息使用说明，并同意按队伍纪律骑行。</view></view></view>
+      <view class="privacy"><view class="privacy-icon">i</view><view>联系电话仅用于本次活动联系，结束后将按平台策略脱敏或删除。</view></view>
     </view>
+
     <view class="sticky-actions"><button class="button button-primary" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submit">提交报名</button></view>
   </block>
+
+  <view wx:if="{{appleModal.visible}}" class="apple-modal-backdrop" catchtouchmove="noop" catchtap="noop">
+    <view class="apple-modal" catchtap="noop">
+      <view class="apple-modal-title">{{appleModal.title}}</view>
+      <view class="apple-modal-content">{{appleModal.content}}</view>
+      <view class="apple-modal-actions">
+        <button wx:if="{{appleModal.showCancel}}" class="apple-modal-button apple-modal-cancel" data-confirm="false" catchtap="resolveAppleModal">{{appleModal.cancelText}}</button>
+        <button class="apple-modal-button {{appleModal.destructive ? 'apple-modal-destructive' : ''}}" data-confirm="true" catchtap="resolveAppleModal">{{appleModal.confirmText}}</button>
+      </view>
+    </view>
+  </view>
 </view>

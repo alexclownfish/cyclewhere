@@ -51,4 +51,15 @@
   </view>
 
   <view class="sticky-actions"><button class="button button-primary" loading="{{submitting}}" disabled="{{submitting || !authReady}}" bindtap="submit">{{authReady ? (editingId ? '保存修改' : '确认发布') : '登录后继续'}}</button></view>
+
+  <view wx:if="{{appleModal.visible}}" class="apple-modal-backdrop" catchtouchmove="noop" catchtap="noop">
+    <view class="apple-modal" catchtap="noop">
+      <view class="apple-modal-title">{{appleModal.title}}</view>
+      <view class="apple-modal-content">{{appleModal.content}}</view>
+      <view class="apple-modal-actions">
+        <button wx:if="{{appleModal.showCancel}}" class="apple-modal-button apple-modal-cancel" data-confirm="false" catchtap="resolveAppleModal">{{appleModal.cancelText}}</button>
+        <button class="apple-modal-button {{appleModal.destructive ? 'apple-modal-destructive' : ''}}" data-confirm="true" catchtap="resolveAppleModal">{{appleModal.confirmText}}</button>
+      </view>
+    </view>
+  </view>
 </view>

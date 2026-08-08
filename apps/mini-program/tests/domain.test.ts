@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import type { PublishEventInput, RegistrationInput } from '../types/domain.ts';
 import { canRegister, formatDuration, makeIdempotencyKey, remainingPlaces, validatePublish, validateRegistration } from '../utils/domain.ts';
+import { errorMessage } from '../utils/presentation.ts';
 
 const registration: RegistrationInput = {
   phone: '13800006721', emergencyContact: '林先生 13600001048', bikeType: '公路车',
@@ -55,4 +56,5 @@ test('publish validation requires manual distance only when no roadbook is selec
 test('presentation helpers are stable', () => {
   assert.equal(formatDuration(190), '3h 10m');
   assert.equal(makeIdempotencyKey('evt', 100), 'registration-evt-100');
+  assert.match(errorMessage({ code: 'VALIDATION_ERROR', details: { fieldErrors: { meetingPoint: ['请填写集合地点'] }, formErrors: [] } }), /集合地点/);
 });
