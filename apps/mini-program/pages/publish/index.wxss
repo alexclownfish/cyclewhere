@@ -29,6 +29,11 @@
 .field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16rpx; }
 .route-picker { display: flex; align-items: center; gap: 18rpx; min-height: 124rpx; padding: 12rpx; border: 1rpx solid rgba(8,127,91,.14); border-radius: 16rpx; background: rgba(8,127,91,.045); }
 .route-picker image { flex: 0 0 auto; width: 126rpx; height: 96rpx; border-radius: 12rpx; background: #e6efeb; }
+.optional-label { margin-left: 8rpx; color: var(--muted); font-size: 20rpx; font-weight: 500; }
+.route-picker-empty { min-height: 104rpx; background: rgba(118,118,128,.055); border-color: rgba(60,60,67,.1); }
+.route-empty-icon { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 76rpx; height: 76rpx; border-radius: 18rpx; background: var(--green-soft); color: var(--green); font-size: 34rpx; font-weight: 700; }
+.route-picker .small { margin-top: 7rpx; color: var(--muted); line-height: 1.4; }
+.manual-route-fields { margin-top: 18rpx; padding: 22rpx 20rpx 4rpx; border: 1rpx solid rgba(8,127,91,.1); border-radius: 16rpx; background: rgba(8,127,91,.035); }
 .cover-picker { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 250rpx; overflow: hidden; border: 1rpx dashed rgba(8,127,91,.28); border-radius: 18rpx; background: rgba(8,127,91,.045); }
 .cover-picker image { width: 100%; height: 100%; }
 .cover-placeholder { display: flex; align-items: center; justify-content: center; gap: 12rpx; color: var(--green-strong); font-size: 23rpx; }

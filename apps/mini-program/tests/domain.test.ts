@@ -40,6 +40,18 @@ test('publish validation enforces structured safety requirements', () => {
   assert.equal(validatePublish({ ...input, requirements: { ...input.requirements, disciplines: [] } }).valid, false);
 });
 
+test('publish validation requires manual distance only when no roadbook is selected', () => {
+  const withoutRoute: PublishEventInput = {
+    title: '城市周末骑行', date: '2026-08-15', time: '06:30', meetingPoint: '市民中心南广场',
+    routeId: '', distanceKm: 0, elevationGainM: 0, difficulty: '中等', capacity: 16,
+    speedRange: '23-26 km/h', description: '遵守交通规则并听从领队安排，路线现场确认。',
+    requirements: { equipment: ['骑行头盔'], recentDistanceKm: 50, recentElevationM: 400, bikeTypes: ['公路车'], disciplines: ['听从领队指挥'] },
+  };
+  assert.equal(validatePublish(withoutRoute).valid, false);
+  assert.equal(validatePublish({ ...withoutRoute, distanceKm: 42 }).valid, true);
+  assert.equal(validatePublish({ ...withoutRoute, routeId: 'route-1' }).valid, true);
+});
+
 test('presentation helpers are stable', () => {
   assert.equal(formatDuration(190), '3h 10m');
   assert.equal(makeIdempotencyKey('evt', 100), 'registration-evt-100');

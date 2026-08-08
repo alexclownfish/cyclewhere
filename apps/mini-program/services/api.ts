@@ -244,16 +244,18 @@ export function createRealApi(transport: Transport, currentUser: UserProvider, a
       await protectedRequest<BackendRegistrationResult>({ url: `/api/v1/events/${eventId}/registrations/me`, method: 'DELETE' });
     },
     async publish(input) {
-      const roadbook = await transport<BackendRoadbook>({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' });
-      const route = mapRoadbook(roadbook);
+      const route = input.routeId
+        ? mapRoadbook(await transport<BackendRoadbook>({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' }))
+        : undefined;
       const draft = await protectedRequest<BackendEvent>({ url: '/api/v1/events', method: 'POST', data: toCreateEvent(input, route) });
       if (input.coverFilePath) await uploadEventCover(draft.id, input.coverFilePath, await authHeaders());
       const published = await protectedRequest<BackendEvent>({ url: `/api/v1/events/${draft.id}/publish`, method: 'POST' });
       return mapEvent(published, route, currentUserId());
     },
     async updateEvent(id, input) {
-      const roadbook = await transport<BackendRoadbook>({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' });
-      const route = mapRoadbook(roadbook);
+      const route = input.routeId
+        ? mapRoadbook(await transport<BackendRoadbook>({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' }))
+        : undefined;
       let updated = await protectedRequest<BackendEvent>({ url: `/api/v1/events/${id}`, method: 'PUT', data: toCreateEvent(input, route) });
       if (input.coverFilePath) updated = await uploadEventCover(id, input.coverFilePath, await authHeaders());
       return mapEvent(updated, route, currentUserId());

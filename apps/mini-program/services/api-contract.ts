@@ -92,7 +92,7 @@ export function mapRegistration(item: BackendRegistration): Registration {
   return { id: item.id, eventId: item.eventId, status: item.status === 'active' ? 'approved' : 'cancelled', phoneMasked: '', bikeType: '', createdAt: item.createdAt };
 }
 
-export function toCreateEvent(input: PublishEventInput, route: RideRoute): CreateBackendEvent {
+export function toCreateEvent(input: PublishEventInput, route?: RideRoute): CreateBackendEvent {
   const startAt = new Date(`${input.date}T${input.time}:00+08:00`);
   const registrationDeadline = new Date(startAt.getTime() - 12 * 60 * 60 * 1000);
   const speeds = input.speedRange.match(/\d+(?:\.\d+)?/g)?.map(Number) || [];
@@ -106,7 +106,9 @@ export function toCreateEvent(input: PublishEventInput, route: RideRoute): Creat
   return {
     routeId: input.routeId || null, title: input.title.trim(), summary: input.description.trim(),
     startAt: startAt.toISOString(), registrationDeadline: registrationDeadline.toISOString(), meetingPoint: input.meetingPoint.trim(),
-    difficulty: difficultyToBackend[route.difficulty], distanceKm: route.distanceKm, elevationGainM: route.elevationGainM,
+    difficulty: difficultyToBackend[route?.difficulty || input.difficulty || '中等'],
+    distanceKm: route?.distanceKm || input.distanceKm || 0,
+    elevationGainM: route?.elevationGainM ?? input.elevationGainM ?? 0,
     speedMinKph: speeds[0] || 20, speedMaxKph: speeds[1] || speeds[0] || 25, capacity: input.capacity,
     equipmentRequirements: input.requirements.equipment, abilityRequirements, safetyNotice: input.description.trim(),
   };

@@ -210,6 +210,32 @@ test('publish adapter creates a draft then calls publish endpoint', async () => 
   assert.equal(event.status, 'published');
 });
 
+test('publish adapter allows an event without a roadbook', async () => {
+  const calls: RequestSpec[] = [];
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    calls.push(spec);
+    if (spec.url === '/api/v1/events') return { ...backendEvent, routeId: null, distanceKm: 42, elevationGainM: 320, status: 'draft' } as T;
+    if (spec.url === '/api/v1/events/event-1/publish') return { ...backendEvent, routeId: null, distanceKm: 42, elevationGainM: 320 } as T;
+    throw new Error(`unexpected ${spec.url}`);
+  };
+  const input: PublishEventInput = {
+    title: '城市周末骑行', date: '2026-09-13', time: '07:00', meetingPoint: '市民中心南广场',
+    routeId: '', distanceKm: 42, elevationGainM: 320, difficulty: '中等', capacity: 20,
+    speedRange: '22-25 km/h', description: '遵守交通规则并听从领队安排，路线现场确认。',
+    requirements: { equipment: ['骑行头盔'], recentDistanceKm: 30, recentElevationM: 200, bikeTypes: ['公路车'], disciplines: ['听从领队指挥'] },
+  };
+  await createRealApi(transport, 'organizer-demo', auth).publish(input);
+  assert.deepEqual(calls.map((item) => `${item.method} ${item.url}`), [
+    'POST /api/v1/events', 'POST /api/v1/events/event-1/publish',
+  ]);
+  assert.deepEqual(calls[0].data && {
+    routeId: (calls[0].data as any).routeId,
+    distanceKm: (calls[0].data as any).distanceKm,
+    elevationGainM: (calls[0].data as any).elevationGainM,
+    difficulty: (calls[0].data as any).difficulty,
+  }, { routeId: null, distanceKm: 42, elevationGainM: 320, difficulty: 'moderate' });
+});
+
 test('publish endpoint normalizes an empty JSON body', () => {
   assert.deepEqual(normalizeRequestSpec({ url: '/api/v1/events/event-1/publish', method: 'POST' }).data, {});
   assert.equal((normalizeRequestSpec({ url: '/api/v1/events', method: 'POST', data: { title: 'x' } }).data as { title: string }).title, 'x');

@@ -83,6 +83,9 @@ export interface PublishEventInput {
   time: string;
   meetingPoint: string;
   routeId: string;
+  distanceKm?: number;
+  elevationGainM?: number;
+  difficulty?: RideRoute['difficulty'];
   capacity: number;
   speedRange: string;
   description: string;

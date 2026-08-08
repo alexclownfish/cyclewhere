@@ -4,15 +4,17 @@ import { validatePublish } from '../../utils/domain';
 import { errorMessage } from '../../utils/presentation';
 
 interface SelectOption { label: string; selected: boolean; }
+interface RouteOption { name: string; route: RideRoute | null; }
 
 Page({
   data: {
-    routes: [] as RideRoute[], selectedRoute: null as RideRoute | null, routeIndex: 0, submitting: false, editingId: '', importingGpx: false,
+    routes: [] as RideRoute[], routeOptions: [{ name: '不选择路书', route: null }] as RouteOption[], selectedRoute: null as RideRoute | null, routeIndex: 0, submitting: false, editingId: '', importingGpx: false,
+    difficultyOptions: ['轻松', '中等', '进阶'] as RideRoute['difficulty'][], difficultyIndex: 1,
     coverPreview: '',
     authChecking: true, authReady: false, authError: '', routesError: '',
     form: {
       title: '十三陵水库周末拉练', date: '2026-08-15', time: '06:30', meetingPoint: '北邵洼地铁站 B 口',
-      routeId: 'route-miaofeng', capacity: 16, speedRange: '23-26 km/h',
+      routeId: '', distanceKm: 0, elevationGainM: 0, difficulty: '中等', capacity: 16, speedRange: '23-26 km/h',
       description: '稳定巡航，设置领队与收队。遇中雨或道路管制将提前取消并通知。',
       requirements: { equipment: [], recentDistanceKm: 50, recentElevationM: 400, bikeTypes: [], disciplines: [], customNote: '' },
     } as PublishEventInput,
@@ -39,8 +41,10 @@ Page({
     try {
       const event = await api.getEvent(id);
       const start = new Date(event.startAt);
-      const routeIndex = Math.max(0, this.data.routes.findIndex((item) => item.id === event.routeId));
-      this.setData({ routeIndex, selectedRoute: event.route, coverPreview: event.coverUrl || '', 'form.title': event.title, 'form.date': `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`, 'form.time': `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`, 'form.meetingPoint': event.meetingPoint, 'form.capacity': event.capacity, 'form.speedRange': event.speedRange, 'form.description': event.description, 'form.routeId': event.routeId, 'form.requirements': event.requirements });
+      const foundIndex = this.data.routes.findIndex((item) => item.id === event.routeId);
+      const selectedRoute = foundIndex >= 0 ? this.data.routes[foundIndex] : null;
+      const difficultyIndex = Math.max(0, this.data.difficultyOptions.indexOf(event.route.difficulty));
+      this.setData({ routeIndex: foundIndex >= 0 ? foundIndex + 1 : 0, selectedRoute, difficultyIndex, coverPreview: event.coverUrl || '', 'form.title': event.title, 'form.date': `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`, 'form.time': `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`, 'form.meetingPoint': event.meetingPoint, 'form.capacity': event.capacity, 'form.speedRange': event.speedRange, 'form.description': event.description, 'form.routeId': event.routeId, 'form.distanceKm': event.route.distanceKm, 'form.elevationGainM': event.route.elevationGainM, 'form.difficulty': event.route.difficulty, 'form.requirements': event.requirements });
       this.setData({ equipmentOptions: this.data.equipmentOptions.map((item) => ({ ...item, selected: event.requirements.equipment.includes(item.label) })), bikeOptions: this.data.bikeOptions.map((item) => ({ ...item, selected: event.requirements.bikeTypes.includes(item.label) })), disciplineOptions: this.data.disciplineOptions.map((item) => ({ ...item, selected: event.requirements.disciplines.includes(item.label) })) });
     } catch (error) { this.setData({ routesError: errorMessage(error) }); }
   },
@@ -62,8 +66,7 @@ Page({
     this.setData({ routesError: '' });
     try {
       const routes = await api.listRoutes();
-      const routeIndex = Math.max(0, routes.findIndex((item) => item.id === 'route-shisanling'));
-      this.setData({ routes, selectedRoute: routes[routeIndex] || null, routeIndex, 'form.routeId': routes[routeIndex]?.id || '' });
+      this.setData({ routes, routeOptions: [{ name: '不选择路书', route: null }, ...routes.map((route) => ({ name: route.name, route }))] });
     } catch (error) { this.setData({ routesError: errorMessage(error) }); }
   },
   onField(event: WechatMiniprogram.Input) { this.setData({ [`form.${event.currentTarget.dataset.field}`]: event.detail.value }); },
@@ -72,7 +75,12 @@ Page({
   onTime(event: WechatMiniprogram.PickerChange) { this.setData({ 'form.time': event.detail.value }); },
   onRoute(event: WechatMiniprogram.PickerChange) {
     const routeIndex = Number(event.detail.value);
-    this.setData({ routeIndex, selectedRoute: this.data.routes[routeIndex], 'form.routeId': this.data.routes[routeIndex].id });
+    const selectedRoute = this.data.routeOptions[routeIndex]?.route || null;
+    this.setData({ routeIndex, selectedRoute, 'form.routeId': selectedRoute?.id || '', 'form.distanceKm': selectedRoute?.distanceKm || 0, 'form.elevationGainM': selectedRoute?.elevationGainM || 0, 'form.difficulty': selectedRoute?.difficulty || '中等', difficultyIndex: selectedRoute ? Math.max(0, this.data.difficultyOptions.indexOf(selectedRoute.difficulty)) : 1 });
+  },
+  onDifficulty(event: WechatMiniprogram.PickerChange) {
+    const difficultyIndex = Number(event.detail.value);
+    this.setData({ difficultyIndex, 'form.difficulty': this.data.difficultyOptions[difficultyIndex] });
   },
   importGpx() {
     if (this.data.importingGpx) return;
@@ -84,7 +92,7 @@ Page({
       try {
         const route = await api.importGpx(file.path, file.name);
         const routes = [route, ...this.data.routes.filter((item) => item.id !== route.id)];
-        this.setData({ routes, selectedRoute: route, routeIndex: 0, 'form.routeId': route.id });
+        this.setData({ routes, routeOptions: [{ name: '不选择路书', route: null }, ...routes.map((item) => ({ name: item.name, route: item }))], selectedRoute: route, routeIndex: 1, 'form.routeId': route.id, 'form.distanceKm': route.distanceKm, 'form.elevationGainM': route.elevationGainM, 'form.difficulty': route.difficulty, difficultyIndex: Math.max(0, this.data.difficultyOptions.indexOf(route.difficulty)) });
         wx.showToast({ title: 'GPX 路书已导入', icon: 'success' });
       } catch (error) { wx.showToast({ title: errorMessage(error), icon: 'none' }); }
       finally { this.setData({ importingGpx: false }); }

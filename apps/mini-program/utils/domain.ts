@@ -1,4 +1,4 @@
-import type { PublishEventInput, RegistrationInput, RideEvent } from '../types/domain.ts';
+import type { PublishEventInput, RegistrationInput, RideEvent } from '../types/domain';
 
 export interface ValidationResult {
   valid: boolean;
@@ -34,6 +34,8 @@ export function validatePublish(input: PublishEventInput): ValidationResult {
   if (input.meetingPoint.trim().length < 4) return { valid: false, message: '请填写明确的集合地点' };
   if (input.description.trim().length < 10) return { valid: false, message: '活动与安全说明至少 10 个字' };
   if (input.capacity < 2 || input.capacity > 200) return { valid: false, message: '人数限制应为 2 至 200 人' };
+  if (!input.routeId && (!input.distanceKm || input.distanceKm <= 0 || input.distanceKm > 1000)) return { valid: false, message: '未选择路书时，请填写有效的预计距离' };
+  if (!input.routeId && ((input.elevationGainM ?? 0) < 0 || (input.elevationGainM ?? 0) > 30000)) return { valid: false, message: '预计爬升应为 0 至 30000 米' };
   if (input.requirements.equipment.length === 0) return { valid: false, message: '请至少选择一项必备装备' };
   if (input.requirements.bikeTypes.length === 0) return { valid: false, message: '请至少选择一种允许车型' };
   if (input.requirements.disciplines.length === 0) return { valid: false, message: '请至少选择一项骑行纪律' };
