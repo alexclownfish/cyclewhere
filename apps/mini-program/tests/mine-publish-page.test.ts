@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
+import { api } from '../services/api';
 
 let mineDefinition: any;
 (globalThis as any).Page = (value: any) => { mineDefinition = value; };
@@ -44,4 +45,76 @@ test('meeting point input suggests recent and route points', () => {
   page.updateLocationSuggestions('北');
   assert.equal(page.data.showLocationSuggestions, true);
   assert.equal(page.data.locationSuggestions[0].label, '北邵洼地铁站');
+});
+
+test('resetForNewEvent clears edit mode and the previous event form', () => {
+  const page = {
+    ...publishDefinition,
+    data: structuredClone(publishDefinition.data),
+    setData(update: Record<string, unknown>, callback?: () => void) { Object.assign(this.data, update); callback?.(); },
+  };
+  page.data.editingId = 'event-old';
+  page.data.form.title = '旧活动标题';
+  page.data.form.meetingPoint = '旧集合点';
+  page.resetForNewEvent();
+  assert.equal(page.data.editingId, '');
+  assert.equal(page.data.form.title, '');
+  assert.equal(page.data.form.meetingPoint, '');
+  assert.equal(page.data.selectedRoute, null);
+});
+
+test('submitting an edit resets the page so the next submit creates a new event', async () => {
+  const calls: string[] = [];
+  const originalUpdate = api.updateEvent;
+  const originalPublish = api.publish;
+  const originalModal = (globalThis as any).wx?.showModal;
+  const originalSwitchTab = (globalThis as any).wx?.switchTab;
+  (api as any).updateEvent = async () => { calls.push('update'); return {}; };
+  (api as any).publish = async () => { calls.push('publish'); return {}; };
+  (globalThis as any).wx = {
+    showModal: async () => ({ confirm: true }),
+    showToast: () => undefined,
+    switchTab: () => undefined,
+  };
+  const page = {
+    ...publishDefinition,
+    data: structuredClone(publishDefinition.data),
+    setData(update: Record<string, unknown>, callback?: () => void) {
+      for (const [path, value] of Object.entries(update)) {
+        const parts = path.split('.');
+        const leaf = parts.pop() as string;
+        const target = parts.reduce((current: Record<string, any>, part) => current[part], this.data as Record<string, any>);
+        target[leaf] = value;
+      }
+      callback?.();
+    },
+  };
+  page.data.authReady = true;
+  page.data.editingId = 'event-old';
+  page.data.form = {
+    ...page.data.form,
+    title: 'Edited event', date: '2026-08-15', time: '06:30', meetingPoint: 'Start point',
+    distanceKm: 80, elevationGainM: 600,
+    description: 'A safe group ride with a leader and sweeper.',
+    requirements: { equipment: ['Helmet'], recentDistanceKm: 50, recentElevationM: 400, bikeTypes: ['Road bike'], disciplines: ['Stay together'], customNote: '' },
+  };
+
+  try {
+    await page.submit();
+    assert.deepEqual(calls, ['update']);
+    assert.equal(page.data.editingId, '');
+    assert.equal(page.data.form.title, '');
+
+    page.data.form.title = 'Brand new event';
+    page.data.form.meetingPoint = 'Another start point';
+    page.data.form.description = 'A new safe group ride with clear rules.';
+    page.data.form.distanceKm = 60;
+    await page.submit();
+    assert.deepEqual(calls, ['update', 'publish']);
+  } finally {
+    (api as any).updateEvent = originalUpdate;
+    (api as any).publish = originalPublish;
+    if (originalModal) (globalThis as any).wx.showModal = originalModal;
+    if (originalSwitchTab) (globalThis as any).wx.switchTab = originalSwitchTab;
+  }
 });

@@ -18,9 +18,9 @@ Page({
     coverPreview: '',
     authChecking: true, authReady: false, authError: '', routesError: '',
     form: {
-      title: '十三陵水库周末拉练', date: '2026-08-15', time: '06:30', meetingPoint: '北邵洼地铁站 B 口',
+      title: '', date: '2026-08-15', time: '06:30', meetingPoint: '',
       routeId: '', distanceKm: 0, elevationGainM: 0, difficulty: '中等', capacity: 16, speedRange: '23-26 km/h',
-      description: '稳定巡航，设置领队与收队。遇中雨或道路管制将提前取消并通知。',
+      description: '',
       requirements: { equipment: [], recentDistanceKm: 50, recentElevationM: 400, bikeTypes: [], disciplines: [], customNote: '' },
     } as PublishEventInput,
     equipmentOptions: [
@@ -125,6 +125,21 @@ Page({
     });
   },
   hideLocationSuggestions() { setTimeout(() => this.setData({ showLocationSuggestions: false }), 160); },
+  resetForNewEvent() {
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    this.setData({
+      editingId: '', selectedRoute: null, routeIndex: 0, coverPreview: '', locationSuggestions: [], showLocationSuggestions: false,
+      form: {
+        title: '', date, time: '06:30', meetingPoint: '', routeId: '', distanceKm: 0, elevationGainM: 0,
+        difficulty: '中等', capacity: 16, speedRange: '23-26 km/h', description: '',
+        requirements: { equipment: [], recentDistanceKm: 50, recentElevationM: 400, bikeTypes: [], disciplines: [], customNote: '' },
+      } as PublishEventInput,
+      equipmentOptions: this.data.equipmentOptions.map((item) => ({ ...item, selected: ['骑行头盔', '前后车灯', '补胎工具', '备用内胎'].includes(item.label) })),
+      bikeOptions: this.data.bikeOptions.map((item) => ({ ...item, selected: ['公路车', '砾石车'].includes(item.label) })),
+      disciplineOptions: this.data.disciplineOptions.map((item) => ({ ...item, selected: true })),
+    }, () => this.syncRequirements());
+  },
   onNumber(event: WechatMiniprogram.Input) { this.setData({ [`form.${event.currentTarget.dataset.field}`]: Number(event.detail.value) }); },
   onDate(event: WechatMiniprogram.PickerChange) { this.setData({ 'form.date': event.detail.value }); },
   onTime(event: WechatMiniprogram.PickerChange) { this.setData({ 'form.time': event.detail.value }); },
@@ -180,14 +195,16 @@ Page({
     if (!validation.valid) return wx.showToast({ title: validation.message, icon: 'none' });
     this.setData({ submitting: true });
     try {
-      if (this.data.editingId) await api.updateEvent(this.data.editingId, this.data.form);
+      const editing = Boolean(this.data.editingId);
+      if (editing) await api.updateEvent(this.data.editingId, this.data.form);
       else await api.publish(this.data.form);
       await wx.showModal({
-        title: this.data.editingId ? '活动已更新' : '活动已发布',
-        content: this.data.editingId ? '修改内容已保存。' : '活动已进入公开列表，可在“我的活动”中继续管理。',
+        title: editing ? '活动已更新' : '活动已发布',
+        content: editing ? '修改内容已保存。' : '活动已进入公开列表，可在“我的活动”中继续管理。',
         showCancel: false,
         confirmText: '查看活动',
       });
+      this.resetForNewEvent();
       wx.switchTab({ url: '/pages/mine/index' });
     } catch (error) {
       await wx.showModal({ title: this.data.editingId ? '保存失败' : '发布失败', content: errorMessage(error), showCancel: false, confirmText: '知道了' });
