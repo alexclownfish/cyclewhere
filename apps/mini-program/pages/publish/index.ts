@@ -5,10 +5,15 @@ import { errorMessage } from '../../utils/presentation';
 
 interface SelectOption { label: string; selected: boolean; }
 interface RouteOption { name: string; route: RideRoute | null; }
+interface LocationSuggestion { label: string; note: string; }
+
+const PENDING_EDIT_KEY = 'pending_edit_event_id';
+const RECENT_MEETING_POINTS_KEY = 'fengji_recent_meeting_points_v1';
 
 Page({
   data: {
     routes: [] as RideRoute[], routeOptions: [{ name: '不选择路书', route: null }] as RouteOption[], selectedRoute: null as RideRoute | null, routeIndex: 0, submitting: false, editingId: '', importingGpx: false,
+    locationSuggestions: [] as LocationSuggestion[], showLocationSuggestions: false,
     difficultyOptions: ['轻松', '中等', '进阶'] as RideRoute['difficulty'][], difficultyIndex: 1,
     coverPreview: '',
     authChecking: true, authReady: false, authError: '', routesError: '',
@@ -36,6 +41,14 @@ Page({
     this.syncRequirements();
     await Promise.all([this.loadRoutes(), this.checkLogin()]);
     if (options.id) { this.setData({ editingId: options.id }); await this.loadEditingEvent(options.id); }
+  },
+  async onShow() {
+    const pendingId = String(wx.getStorageSync(PENDING_EDIT_KEY) || '');
+    if (!pendingId || this.data.editingId === pendingId) return;
+    wx.removeStorageSync(PENDING_EDIT_KEY);
+    this.setData({ editingId: pendingId, routesError: '' });
+    if (!this.data.routes.length) await this.loadRoutes();
+    await this.loadEditingEvent(pendingId);
   },
   async loadEditingEvent(id: string) {
     try {
@@ -69,7 +82,49 @@ Page({
       this.setData({ routes, routeOptions: [{ name: '不选择路书', route: null }, ...routes.map((route) => ({ name: route.name, route }))] });
     } catch (error) { this.setData({ routesError: errorMessage(error) }); }
   },
-  onField(event: WechatMiniprogram.Input) { this.setData({ [`form.${event.currentTarget.dataset.field}`]: event.detail.value }); },
+  onField(event: WechatMiniprogram.Input) {
+    const field = String(event.currentTarget.dataset.field || '');
+    const value = event.detail.value;
+    this.setData({ [`form.${field}`]: value });
+    if (field === 'meetingPoint') this.updateLocationSuggestions(value);
+  },
+  showLocationSuggestions() {
+    this.updateLocationSuggestions(this.data.form.meetingPoint);
+  },
+  updateLocationSuggestions(value: string) {
+    const query = value.trim().toLowerCase();
+    const recent = (wx.getStorageSync(RECENT_MEETING_POINTS_KEY) || []) as string[];
+    const routePoints = this.data.routes.flatMap((route) => route.pois
+      .filter((poi) => poi.kind === 'meeting' || poi.kind === 'supply')
+      .map((poi) => ({ label: poi.name, note: `${route.name} · ${poi.note}` })));
+    const recentPoints = recent.map((label) => ({ label, note: '最近使用' }));
+    const seen = new Set<string>();
+    const suggestions = [...recentPoints, ...routePoints]
+      .filter((item) => item.label && (!query || `${item.label}${item.note}`.toLowerCase().includes(query)))
+      .filter((item) => { if (seen.has(item.label)) return false; seen.add(item.label); return item.label !== value.trim(); })
+      .slice(0, 6);
+    this.setData({ locationSuggestions: suggestions, showLocationSuggestions: suggestions.length > 0 });
+  },
+  chooseMeetingPoint(event: WechatMiniprogram.TouchEvent) {
+    const label = String(event.currentTarget.dataset.label || '');
+    if (!label) return;
+    const recent = (wx.getStorageSync(RECENT_MEETING_POINTS_KEY) || []) as string[];
+    wx.setStorageSync(RECENT_MEETING_POINTS_KEY, [label, ...recent.filter((item) => item !== label)].slice(0, 8));
+    this.setData({ 'form.meetingPoint': label, showLocationSuggestions: false });
+  },
+  chooseMeetingPointOnMap() {
+    wx.chooseLocation({
+      success: (result) => {
+        if (!result.name && !result.address) return;
+        const label = result.name || result.address;
+        const recent = (wx.getStorageSync(RECENT_MEETING_POINTS_KEY) || []) as string[];
+        wx.setStorageSync(RECENT_MEETING_POINTS_KEY, [label, ...recent.filter((item) => item !== label)].slice(0, 8));
+        this.setData({ 'form.meetingPoint': label, showLocationSuggestions: false });
+      },
+      fail: () => undefined,
+    });
+  },
+  hideLocationSuggestions() { setTimeout(() => this.setData({ showLocationSuggestions: false }), 160); },
   onNumber(event: WechatMiniprogram.Input) { this.setData({ [`form.${event.currentTarget.dataset.field}`]: Number(event.detail.value) }); },
   onDate(event: WechatMiniprogram.PickerChange) { this.setData({ 'form.date': event.detail.value }); },
   onTime(event: WechatMiniprogram.PickerChange) { this.setData({ 'form.time': event.detail.value }); },

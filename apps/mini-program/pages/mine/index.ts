@@ -189,5 +189,10 @@ Page({
     });
   },
   cancelEditProfile() { this.setData({ profileEditing: false }); },
-  editEvent(event: WechatMiniprogram.TouchEvent) { wx.navigateTo({ url: `/pages/publish/index?id=${event.currentTarget.dataset.id}` }); },
+  editEvent(event: WechatMiniprogram.TouchEvent) {
+    const id = String(event.currentTarget.dataset.id || '');
+    if (!id) return wx.showToast({ title: '活动信息暂不可用', icon: 'none' });
+    wx.setStorageSync('pending_edit_event_id', id);
+    wx.switchTab({ url: '/pages/publish/index' });
+  },
 });

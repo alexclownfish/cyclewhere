@@ -3,9 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const api_1 = require("../../services/api");
 const domain_1 = require("../../utils/domain");
 const presentation_1 = require("../../utils/presentation");
+const PENDING_EDIT_KEY = 'pending_edit_event_id';
+const RECENT_MEETING_POINTS_KEY = 'fengji_recent_meeting_points_v1';
 Page({
     data: {
         routes: [], routeOptions: [{ name: '不选择路书', route: null }], selectedRoute: null, routeIndex: 0, submitting: false, editingId: '', importingGpx: false,
+        locationSuggestions: [], showLocationSuggestions: false,
         difficultyOptions: ['轻松', '中等', '进阶'], difficultyIndex: 1,
         coverPreview: '',
         authChecking: true, authReady: false, authError: '', routesError: '',
@@ -36,6 +39,16 @@ Page({
             this.setData({ editingId: options.id });
             await this.loadEditingEvent(options.id);
         }
+    },
+    async onShow() {
+        const pendingId = String(wx.getStorageSync(PENDING_EDIT_KEY) || '');
+        if (!pendingId || this.data.editingId === pendingId)
+            return;
+        wx.removeStorageSync(PENDING_EDIT_KEY);
+        this.setData({ editingId: pendingId, routesError: '' });
+        if (!this.data.routes.length)
+            await this.loadRoutes();
+        await this.loadEditingEvent(pendingId);
     },
     async loadEditingEvent(id) {
         try {
@@ -76,7 +89,53 @@ Page({
             this.setData({ routesError: (0, presentation_1.errorMessage)(error) });
         }
     },
-    onField(event) { this.setData({ [`form.${event.currentTarget.dataset.field}`]: event.detail.value }); },
+    onField(event) {
+        const field = String(event.currentTarget.dataset.field || '');
+        const value = event.detail.value;
+        this.setData({ [`form.${field}`]: value });
+        if (field === 'meetingPoint')
+            this.updateLocationSuggestions(value);
+    },
+    showLocationSuggestions() {
+        this.updateLocationSuggestions(this.data.form.meetingPoint);
+    },
+    updateLocationSuggestions(value) {
+        const query = value.trim().toLowerCase();
+        const recent = (wx.getStorageSync(RECENT_MEETING_POINTS_KEY) || []);
+        const routePoints = this.data.routes.flatMap((route) => route.pois
+            .filter((poi) => poi.kind === 'meeting' || poi.kind === 'supply')
+            .map((poi) => ({ label: poi.name, note: `${route.name} · ${poi.note}` })));
+        const recentPoints = recent.map((label) => ({ label, note: '最近使用' }));
+        const seen = new Set();
+        const suggestions = [...recentPoints, ...routePoints]
+            .filter((item) => item.label && (!query || `${item.label}${item.note}`.toLowerCase().includes(query)))
+            .filter((item) => { if (seen.has(item.label))
+            return false; seen.add(item.label); return item.label !== value.trim(); })
+            .slice(0, 6);
+        this.setData({ locationSuggestions: suggestions, showLocationSuggestions: suggestions.length > 0 });
+    },
+    chooseMeetingPoint(event) {
+        const label = String(event.currentTarget.dataset.label || '');
+        if (!label)
+            return;
+        const recent = (wx.getStorageSync(RECENT_MEETING_POINTS_KEY) || []);
+        wx.setStorageSync(RECENT_MEETING_POINTS_KEY, [label, ...recent.filter((item) => item !== label)].slice(0, 8));
+        this.setData({ 'form.meetingPoint': label, showLocationSuggestions: false });
+    },
+    chooseMeetingPointOnMap() {
+        wx.chooseLocation({
+            success: (result) => {
+                if (!result.name && !result.address)
+                    return;
+                const label = result.name || result.address;
+                const recent = (wx.getStorageSync(RECENT_MEETING_POINTS_KEY) || []);
+                wx.setStorageSync(RECENT_MEETING_POINTS_KEY, [label, ...recent.filter((item) => item !== label)].slice(0, 8));
+                this.setData({ 'form.meetingPoint': label, showLocationSuggestions: false });
+            },
+            fail: () => undefined,
+        });
+    },
+    hideLocationSuggestions() { setTimeout(() => this.setData({ showLocationSuggestions: false }), 160); },
     onNumber(event) { this.setData({ [`form.${event.currentTarget.dataset.field}`]: Number(event.detail.value) }); },
     onDate(event) { this.setData({ 'form.date': event.detail.value }); },
     onTime(event) { this.setData({ 'form.time': event.detail.value }); },
