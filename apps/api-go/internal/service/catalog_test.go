@@ -35,6 +35,13 @@ func (r *testRepository) UpsertUserProfile(_ context.Context, value domain.UserP
 	r.profiles[value.ID] = value
 	return value, nil
 }
+
+func (*testRepository) GetUserIDByPhoneHash(context.Context, string) (*string, error) {
+	return nil, nil
+}
+func (*testRepository) BindUserPhone(context.Context, string, string, string, string, time.Time) error {
+	return nil
+}
 func (r *testRepository) CreateEvent(_ context.Context, value domain.Event) (domain.Event, error) {
 	r.events[value.ID] = value
 	return value, nil

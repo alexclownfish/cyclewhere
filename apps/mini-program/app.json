@@ -1,5 +1,6 @@
 {
   "pages": [
+    "pages/login/index",
     "pages/events/index",
     "pages/event-detail/index",
     "pages/register/index",
@@ -12,13 +13,13 @@
     "navigationBarTitleText": "风迹骑行",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f4f5f6",
+    "backgroundColor": "#f3f7f5",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
     "color": "#73787c",
-    "selectedColor": "#d9433b",
-    "backgroundColor": "#ffffff",
+    "selectedColor": "#087f5b",
+    "backgroundColor": "#f8fbf9",
     "borderStyle": "black",
     "list": [
       { "pagePath": "pages/events/index", "text": "活动" },

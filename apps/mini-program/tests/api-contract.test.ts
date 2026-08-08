@@ -97,6 +97,45 @@ test('authentication provider exchanges one WeChat code and reuses the stored be
   assert.equal((values.get('demo_account') as { id: string }).id, 'user-1');
 });
 
+test('phone login exchanges WeChat login and phone codes and stores the session', async () => {
+  const originalWx = (globalThis as { wx?: unknown }).wx;
+  const values = new Map<string, unknown>();
+  const calls: RequestSpec[] = [];
+  (globalThis as any).wx = {
+    login: ({ success }: { success: (result: { code: string }) => void }) => success({ code: 'wechat-login-code' }),
+    setStorageSync: (key: string, value: unknown) => values.set(key, value),
+  };
+  const profile = { id: 'phone-user', nickname: '微信骑友', avatarUrl: null, phoneMasked: '138****8000' };
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    calls.push(spec);
+    return { accessToken: 'issued-phone-token', expiresIn: 604800, user: { id: 'phone-user', profile } } as T;
+  };
+  try {
+    await createRealApi(transport, 'phone-user', auth).phoneLogin('phone-auth-code');
+    assert.deepEqual(calls[0].data, { loginCode: 'wechat-login-code', phoneCode: 'phone-auth-code' });
+    assert.equal(calls[0].url, '/api/v1/auth/wechat/phone-login');
+    assert.equal(values.get('auth_token'), 'issued-phone-token');
+    assert.deepEqual(values.get('demo_account'), profile);
+  } finally {
+    if (originalWx === undefined) delete (globalThis as { wx?: unknown }).wx;
+    else (globalThis as { wx?: unknown }).wx = originalWx;
+  }
+});
+
+test('authenticated user binds an official WeChat phone code', async () => {
+  const calls: RequestSpec[] = [];
+  const profile = { id: 'user-1', nickname: '微信骑友', avatarUrl: null, phoneMasked: '138****8000' };
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    calls.push(spec);
+    return { profile } as T;
+  };
+  const result = await createRealApi(transport, 'user-1', auth).bindPhone('phone-auth-code');
+  assert.deepEqual(result, profile);
+  assert.equal(calls[0].url, '/api/v1/me/phone');
+  assert.deepEqual(calls[0].data, { code: 'phone-auth-code' });
+  assert.equal(calls[0].header?.Authorization, 'Bearer verified-test-token');
+});
+
 test('public event detail remains available when login is unavailable', async () => {
   const calls: string[] = [];
   const transport: Transport = async <T>(spec: RequestSpec) => {

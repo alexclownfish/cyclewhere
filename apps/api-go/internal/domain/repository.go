@@ -28,6 +28,8 @@ type RegisterCommand struct {
 type Repository interface {
 	GetUserProfile(context.Context, string) (*UserProfile, error)
 	UpsertUserProfile(context.Context, UserProfile) (UserProfile, error)
+	GetUserIDByPhoneHash(context.Context, string) (*string, error)
+	BindUserPhone(context.Context, string, string, string, string, time.Time) error
 	CreateEvent(context.Context, Event) (Event, error)
 	UpdateEvent(context.Context, Event) (Event, error)
 	GetEvent(context.Context, string) (*Event, error)

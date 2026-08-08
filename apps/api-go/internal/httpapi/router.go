@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -52,21 +53,23 @@ type Dependencies struct {
 	Issuer          *auth.Issuer
 	Verifier        *auth.Verifier
 	WeChat          auth.WeChatSessionGateway
+	WeChatPhone     auth.WeChatPhoneGateway
 	Encryptor       *security.FieldEncryptor
 	AvatarUploadDir string
 	Now             func() time.Time
 }
 
 type API struct {
-	repository domain.Repository
-	catalog    *service.Catalog
-	issuer     *auth.Issuer
-	verifier   *auth.Verifier
-	wechat     auth.WeChatSessionGateway
-	encryptor  *security.FieldEncryptor
-	avatarDir  string
-	now        func() time.Time
-	limiter    *loginLimiter
+	repository  domain.Repository
+	catalog     *service.Catalog
+	issuer      *auth.Issuer
+	verifier    *auth.Verifier
+	wechat      auth.WeChatSessionGateway
+	wechatPhone auth.WeChatPhoneGateway
+	encryptor   *security.FieldEncryptor
+	avatarDir   string
+	now         func() time.Time
+	limiter     *loginLimiter
 }
 
 func NewRouter(deps Dependencies) (*gin.Engine, error) {
@@ -76,9 +79,16 @@ func NewRouter(deps Dependencies) (*gin.Engine, error) {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
+	phoneGateway := deps.WeChatPhone
+	if phoneGateway == nil {
+		phoneGateway, _ = deps.WeChat.(auth.WeChatPhoneGateway)
+	}
+	if phoneGateway == nil {
+		phoneGateway = auth.DisabledWeChatSessionGateway{}
+	}
 	api := &API{
 		repository: deps.Repository, catalog: deps.Catalog, issuer: deps.Issuer,
-		verifier: deps.Verifier, wechat: deps.WeChat, encryptor: deps.Encryptor,
+		verifier: deps.Verifier, wechat: deps.WeChat, wechatPhone: phoneGateway, encryptor: deps.Encryptor,
 		avatarDir: deps.AvatarUploadDir, now: deps.Now, limiter: newLoginLimiter(),
 	}
 	gin.SetMode(gin.ReleaseMode)
@@ -91,6 +101,7 @@ func NewRouter(deps Dependencies) (*gin.Engine, error) {
 
 	v1 := router.Group("/api/v1")
 	v1.POST("/auth/wechat/login", api.login)
+	v1.POST("/auth/wechat/phone-login", api.phoneLogin)
 	v1.GET("/avatars/:fileName", api.getAvatar)
 	v1.GET("/event-covers/:fileName", api.getEventCover)
 	v1.GET("/events", api.listEvents)
@@ -102,6 +113,7 @@ func NewRouter(deps Dependencies) (*gin.Engine, error) {
 	protected.Use(api.requireAuth())
 	protected.GET("/me/profile", api.getProfile)
 	protected.PUT("/me/profile", api.updateProfile)
+	protected.POST("/me/phone", api.bindPhone)
 	protected.POST("/me/avatar", api.uploadAvatar)
 	protected.POST("/me/avatar/base64", api.uploadAvatarBase64)
 	protected.GET("/me/events", api.listOwnedEvents)
@@ -202,12 +214,139 @@ func (a *API) login(c *gin.Context) {
 		return
 	}
 	id := auth.StableUserID(session.OpenID)
-	token, err := a.issuer.Issue(id)
+	profile, err := a.ensureDefaultProfile(c, id)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
+	a.writeLoginResponse(c, id, profile)
+}
+
+func (a *API) phoneLogin(c *gin.Context) {
+	if err := a.limiter.Check(c.ClientIP(), a.now()); err != nil {
+		writeError(c, err)
+		return
+	}
+	var input struct {
+		LoginCode string `json:"loginCode"`
+		PhoneCode string `json:"phoneCode"`
+	}
+	if err := decodeJSON(c, &input, true); err != nil {
+		writeDecodeError(c, err)
+		return
+	}
+	input.LoginCode = strings.TrimSpace(input.LoginCode)
+	input.PhoneCode = strings.TrimSpace(input.PhoneCode)
+	if len(input.LoginCode) < 6 || len(input.LoginCode) > 256 || len(input.PhoneCode) < 6 || len(input.PhoneCode) > 256 {
+		writeValidation(c)
+		return
+	}
+	session, err := a.wechat.Exchange(c.Request.Context(), input.LoginCode)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	phone, err := a.wechatPhone.ExchangePhone(c.Request.Context(), input.PhoneCode)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	if !phonePattern.MatchString(phone) {
+		writeError(c, domain.NewError("PHONE_UNSUPPORTED", "暂仅支持中国大陆手机号", 400))
+		return
+	}
+	phoneHash := fmt.Sprintf("%x", sha256.Sum256([]byte(phone)))
+	id := auth.StableUserID(session.OpenID)
+	boundID, err := a.repository.GetUserIDByPhoneHash(c.Request.Context(), phoneHash)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	if boundID != nil {
+		id = *boundID
+	}
+	profile, err := a.ensureDefaultProfile(c, id)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	if err := a.storePhone(c, id, phone, phoneHash); err != nil {
+		writeError(c, err)
+		return
+	}
+	profile.PhoneMasked = phoneMask(phone)
+	a.writeLoginResponse(c, id, profile)
+}
+
+func (a *API) bindPhone(c *gin.Context) {
+	var input struct {
+		Code string `json:"code"`
+	}
+	if err := decodeJSON(c, &input, true); err != nil {
+		writeDecodeError(c, err)
+		return
+	}
+	input.Code = strings.TrimSpace(input.Code)
+	if len(input.Code) < 6 || len(input.Code) > 256 {
+		writeValidation(c)
+		return
+	}
+	phone, err := a.wechatPhone.ExchangePhone(c.Request.Context(), input.Code)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	if !phonePattern.MatchString(phone) {
+		writeError(c, domain.NewError("PHONE_UNSUPPORTED", "暂仅支持中国大陆手机号", 400))
+		return
+	}
+	phoneHash := fmt.Sprintf("%x", sha256.Sum256([]byte(phone)))
+	if err := a.storePhone(c, userID(c), phone, phoneHash); err != nil {
+		writeError(c, err)
+		return
+	}
+	profile, err := a.repository.GetUserProfile(c.Request.Context(), userID(c))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, data(gin.H{"profile": profileResponse(profile)}))
+}
+
+func (a *API) storePhone(c *gin.Context, id, phone, phoneHash string) error {
+	encrypted, err := a.encryptor.Encrypt(phone)
+	if err != nil {
+		return err
+	}
+	masked := phoneMask(phone)
+	return a.repository.BindUserPhone(c.Request.Context(), id, phoneHash, encrypted, *masked, a.now().UTC())
+}
+
+func phoneMask(phone string) *string {
+	masked := phone
+	if len(phone) >= 7 {
+		masked = phone[:3] + "****" + phone[len(phone)-4:]
+	}
+	return &masked
+}
+
+func (a *API) ensureDefaultProfile(c *gin.Context, id string) (*domain.UserProfile, error) {
 	profile, err := a.repository.GetUserProfile(c.Request.Context(), id)
+	if err != nil || profile != nil {
+		return profile, err
+	}
+	nickname := "微信骑友"
+	created, err := a.repository.UpsertUserProfile(c.Request.Context(), domain.UserProfile{
+		ID: id, Nickname: &nickname, UpdatedAt: a.now().UTC(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &created, nil
+}
+
+func (a *API) writeLoginResponse(c *gin.Context, id string, profile *domain.UserProfile) {
+	token, err := a.issuer.Issue(id)
 	if err != nil {
 		writeError(c, err)
 		return

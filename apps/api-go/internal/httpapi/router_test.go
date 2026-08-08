@@ -32,6 +32,15 @@ type fakeWeChat struct {
 	err     error
 }
 
+type fakeWeChatPhone struct {
+	phone string
+	err   error
+}
+
+func (f fakeWeChatPhone) ExchangePhone(context.Context, string) (string, error) {
+	return f.phone, f.err
+}
+
 func (f fakeWeChat) Exchange(context.Context, string) (auth.WeChatSession, error) {
 	return f.session, f.err
 }
@@ -44,6 +53,35 @@ type fakeRepository struct {
 	registerCalls  []domain.RegisterCommand
 	registrations  map[string]domain.RegistrationResult
 	profileUpserts int
+	phoneUsers     map[string]string
+	phoneMasked    string
+}
+
+func (f *fakeRepository) GetUserIDByPhoneHash(_ context.Context, phoneHash string) (*string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	userID, ok := f.phoneUsers[phoneHash]
+	if !ok {
+		return nil, nil
+	}
+	return &userID, nil
+}
+
+func (f *fakeRepository) BindUserPhone(_ context.Context, userID, phoneHash, _ string, phoneMasked string, _ time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.phoneUsers == nil {
+		f.phoneUsers = make(map[string]string)
+	}
+	if existing, ok := f.phoneUsers[phoneHash]; ok && existing != userID {
+		return domain.Conflict("PHONE_ALREADY_BOUND", "phone already bound")
+	}
+	f.phoneUsers[phoneHash] = userID
+	f.phoneMasked = phoneMasked
+	if f.profile != nil && f.profile.ID == userID {
+		f.profile.PhoneMasked = &f.phoneMasked
+	}
+	return nil
 }
 
 func (f *fakeRepository) GetUserProfile(_ context.Context, userID string) (*domain.UserProfile, error) {
@@ -195,6 +233,7 @@ func newContractRouter(t *testing.T, repository *fakeRepository, avatarDir strin
 		Issuer:          issuer,
 		Verifier:        verifier,
 		WeChat:          fakeWeChat{session: auth.WeChatSession{OpenID: "openid-contract-user"}},
+		WeChatPhone:     fakeWeChatPhone{phone: "13800138000"},
 		Encryptor:       encryptor,
 		AvatarUploadDir: avatarDir,
 		Now:             func() time.Time { return contractNow },
@@ -273,7 +312,7 @@ func TestHealthContract(t *testing.T) {
 	}
 }
 
-func TestLoginCreatesJWTEnvelopeWithNullProfile(t *testing.T) {
+func TestLoginCreatesJWTEnvelopeAndDefaultProfile(t *testing.T) {
 	repository := &fakeRepository{}
 	router, _, verifier, _ := newContractRouter(t, repository, t.TempDir())
 	response := perform(router, http.MethodPost, "/api/v1/auth/wechat/login", `{"code":"valid-login-code"}`, "")
@@ -292,12 +331,49 @@ func TestLoginCreatesJWTEnvelopeWithNullProfile(t *testing.T) {
 	}
 	user := nestedObject(t, data["user"], "data.user")
 	wantUserID := auth.StableUserID("openid-contract-user")
-	if user["id"] != wantUserID || user["profile"] != nil {
-		t.Fatalf("user = %#v, want id %q and null profile", user, wantUserID)
+	profile := nestedObject(t, user["profile"], "data.user.profile")
+	if user["id"] != wantUserID || profile["nickname"] != "微信骑友" {
+		t.Fatalf("user = %#v, want id %q and default profile", user, wantUserID)
 	}
 	verified, err := verifier.Verify("Bearer " + token)
 	if err != nil || verified.ID != wantUserID {
 		t.Fatalf("verify login JWT: user=%#v err=%v", verified, err)
+	}
+}
+
+func TestPhoneLoginCreatesAccountAndStoresMaskedPhone(t *testing.T) {
+	repository := &fakeRepository{}
+	router, _, verifier, _ := newContractRouter(t, repository, t.TempDir())
+	response := perform(router, http.MethodPost, "/api/v1/auth/wechat/phone-login", `{"loginCode":"valid-login-code","phoneCode":"valid-phone-code"}`, "")
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	data := nestedObject(t, decodeObject(t, response)["data"], "data")
+	user := nestedObject(t, data["user"], "data.user")
+	profile := nestedObject(t, user["profile"], "data.user.profile")
+	if profile["phoneMasked"] != "138****8000" {
+		t.Fatalf("profile = %#v", profile)
+	}
+	token := data["accessToken"].(string)
+	verified, err := verifier.Verify("Bearer " + token)
+	if err != nil || verified.ID != auth.StableUserID("openid-contract-user") {
+		t.Fatalf("verify phone login token: user=%#v err=%v", verified, err)
+	}
+}
+
+func TestAuthenticatedUserCanBindPhone(t *testing.T) {
+	nickname := "Rider"
+	repository := &fakeRepository{profile: &domain.UserProfile{ID: "profile-user", Nickname: &nickname, UpdatedAt: contractNow}}
+	router, issuer, _, _ := newContractRouter(t, repository, t.TempDir())
+	response := perform(router, http.MethodPost, "/api/v1/me/phone", `{"code":"valid-phone-code"}`, authHeader(t, issuer, "profile-user"))
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	profile := nestedObject(t, nestedObject(t, decodeObject(t, response)["data"], "data")["profile"], "data.profile")
+	if profile["phoneMasked"] != "138****8000" {
+		t.Fatalf("profile = %#v", profile)
 	}
 }
 

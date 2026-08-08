@@ -95,6 +95,7 @@ export interface UserProfile {
   id: string;
   nickname: string | null;
   avatarUrl: string | null;
+  phoneMasked?: string | null;
   gender?: number | null;
   country?: string | null;
   province?: string | null;

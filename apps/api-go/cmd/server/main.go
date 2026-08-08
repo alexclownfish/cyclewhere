@@ -56,16 +56,20 @@ func run() error {
 		return err
 	}
 	var wechat auth.WeChatSessionGateway = auth.DisabledWeChatSessionGateway{}
+	var wechatPhone auth.WeChatPhoneGateway = auth.DisabledWeChatSessionGateway{}
 	if cfg.WeChatAppID != "" && cfg.WeChatAppSecret != "" {
-		wechat, err = auth.NewWeChatHTTPGateway(cfg.WeChatAppID, cfg.WeChatAppSecret)
+		gateway, gatewayErr := auth.NewWeChatHTTPGateway(cfg.WeChatAppID, cfg.WeChatAppSecret)
+		err = gatewayErr
 		if err != nil {
 			return err
 		}
+		wechat = gateway
+		wechatPhone = gateway
 	}
 	catalog := service.NewCatalog(repository, time.Now)
 	router, err := httpapi.NewRouter(httpapi.Dependencies{
 		Repository: repository, Catalog: catalog, Issuer: issuer, Verifier: verifier,
-		WeChat: wechat, Encryptor: encryptor, AvatarUploadDir: cfg.AvatarUploadDir,
+		WeChat: wechat, WeChatPhone: wechatPhone, Encryptor: encryptor, AvatarUploadDir: cfg.AvatarUploadDir,
 	})
 	if err != nil {
 		return err

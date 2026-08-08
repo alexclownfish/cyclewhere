@@ -113,6 +113,28 @@ function createRealApi(transport, currentUser, authHeaders) {
         async login(forceRefresh = false) {
             await authHeaders(forceRefresh);
         },
+        async phoneLogin(phoneCode) {
+            if (typeof wx === 'undefined')
+                throw new ApiError('微信环境不可用', 0, 'WX_UNAVAILABLE');
+            const result = await transport({
+                url: '/api/v1/auth/wechat/phone-login', method: 'POST',
+                data: { loginCode: await wechatLogin(), phoneCode },
+            });
+            wx.setStorageSync('auth_token', result.accessToken);
+            wx.setStorageSync('demo_account', result.user.profile
+                ? { ...result.user.profile, id: result.user.id }
+                : { id: result.user.id, nickname: '微信骑友', city: '' });
+        },
+        async bindPhone(phoneCode) {
+            const result = await protectedRequest({
+                url: '/api/v1/me/phone', method: 'POST', data: { code: phoneCode },
+            });
+            if (typeof wx !== 'undefined') {
+                const current = wx.getStorageSync('demo_account') || {};
+                wx.setStorageSync('demo_account', { ...current, ...result.profile });
+            }
+            return result.profile;
+        },
         async registerProfile(nickname, avatarFilePath, forceRefresh = false) {
             await authHeaders(forceRefresh);
             try {
@@ -308,6 +330,8 @@ const realApi = createRealApi(wxTransport, () => wx.getStorageSync('demo_account
 exports.api = env_1.USE_MOCK ? {
     ...mock_api_1.mockApi,
     login: async () => undefined,
+    phoneLogin: async () => undefined,
+    bindPhone: async () => ({ id: 'mock-user', nickname: '微信骑友', avatarUrl: null, phoneMasked: '138****8000', city: '' }),
     registerProfile: async (nickname) => ({ id: 'mock-user', nickname, avatarUrl: null, city: '' }),
     register: (eventId, input) => mock_api_1.mockApi.register(eventId, input),
 } : realApi;

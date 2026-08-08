@@ -96,7 +96,8 @@ func profileResponse(profile *domain.UserProfile) any {
 	}
 	return gin.H{
 		"id": profile.ID, "nickname": profile.Nickname, "avatarUrl": profile.AvatarURL,
-		"gender": profile.Gender, "country": profile.Country, "province": profile.Province,
+		"phoneMasked": profile.PhoneMasked,
+		"gender":      profile.Gender, "country": profile.Country, "province": profile.Province,
 		"city": profile.City, "updatedAt": isoTime(profile.UpdatedAt),
 	}
 }

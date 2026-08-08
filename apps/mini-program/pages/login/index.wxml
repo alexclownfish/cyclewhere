@@ -1,0 +1,24 @@
+<view class="login-page">
+  <view class="brand-mark">
+    <view class="brand-road"></view>
+    <view class="brand-wheel wheel-left"></view>
+    <view class="brand-wheel wheel-right"></view>
+  </view>
+
+  <view class="brand-name">风迹骑行</view>
+  <view class="brand-copy">发现活动 · 共享路书 · 一起出发</view>
+
+  <view class="login-actions">
+    <button class="wechat-button" loading="{{loading}}" disabled="{{loading}}" bindtap="wechatLogin">
+      <text class="wechat-icon">微</text>
+      <text>微信一键登录</text>
+    </button>
+    <button class="phone-button" disabled="{{loading}}" open-type="getPhoneNumber" bindgetphonenumber="phoneLogin">
+      <text class="phone-icon">⌁</text>
+      <text>手机号快捷登录</text>
+    </button>
+    <view wx:if="{{error}}" class="login-error">{{error}}</view>
+  </view>
+
+  <view class="privacy-copy">登录即表示同意隐私保护规则，手机号仅用于账号识别和活动联系</view>
+</view>

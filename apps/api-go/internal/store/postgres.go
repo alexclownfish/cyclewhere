@@ -56,7 +56,8 @@ func Open(ctx context.Context, databaseURL string, maxConnections int32) (*Postg
 func (p *Postgres) Close() { p.pool.Close() }
 
 func (p *Postgres) GetUserProfile(ctx context.Context, userID string) (*domain.UserProfile, error) {
-	profile, err := scanUserProfile(p.pool.QueryRow(ctx, `SELECT id,nickname,avatar_url,gender,country,province,city,updated_at FROM user_profiles WHERE id=$1`, userID))
+	profile, err := scanUserProfile(p.pool.QueryRow(ctx, `SELECT p.id,p.nickname,p.avatar_url,b.phone_masked,p.gender,p.country,p.province,p.city,p.updated_at
+    FROM user_profiles p LEFT JOIN user_phone_bindings b ON b.user_id=p.id WHERE p.id=$1`, userID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -67,15 +68,44 @@ func (p *Postgres) GetUserProfile(ctx context.Context, userID string) (*domain.U
 }
 
 func (p *Postgres) UpsertUserProfile(ctx context.Context, profile domain.UserProfile) (domain.UserProfile, error) {
-	return scanUserProfile(p.pool.QueryRow(ctx, `INSERT INTO user_profiles
+	_, err := p.pool.Exec(ctx, `INSERT INTO user_profiles
     (id,nickname,avatar_url,gender,country,province,city,updated_at)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
     ON CONFLICT (id) DO UPDATE SET nickname=EXCLUDED.nickname,avatar_url=EXCLUDED.avatar_url,
       gender=EXCLUDED.gender,country=EXCLUDED.country,province=EXCLUDED.province,
-      city=EXCLUDED.city,updated_at=EXCLUDED.updated_at
-    RETURNING id,nickname,avatar_url,gender,country,province,city,updated_at`,
+      city=EXCLUDED.city,updated_at=EXCLUDED.updated_at`,
 		profile.ID, profile.Nickname, profile.AvatarURL, profile.Gender, profile.Country,
-		profile.Province, profile.City, profile.UpdatedAt))
+		profile.Province, profile.City, profile.UpdatedAt)
+	if err != nil {
+		return domain.UserProfile{}, err
+	}
+	updated, err := p.GetUserProfile(ctx, profile.ID)
+	if err != nil || updated == nil {
+		return domain.UserProfile{}, err
+	}
+	return *updated, nil
+}
+
+func (p *Postgres) GetUserIDByPhoneHash(ctx context.Context, phoneHash string) (*string, error) {
+	var userID string
+	err := p.pool.QueryRow(ctx, `SELECT user_id FROM user_phone_bindings WHERE phone_hash=$1`, phoneHash).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &userID, nil
+}
+
+func (p *Postgres) BindUserPhone(ctx context.Context, userID, phoneHash, phoneEncrypted, phoneMasked string, now time.Time) error {
+	_, err := p.pool.Exec(ctx, `INSERT INTO user_phone_bindings
+    (user_id,phone_hash,phone_encrypted,phone_masked,created_at,updated_at)
+    VALUES ($1,$2,$3,$4,$5,$5)
+    ON CONFLICT (user_id) DO UPDATE SET phone_hash=EXCLUDED.phone_hash,
+      phone_encrypted=EXCLUDED.phone_encrypted,phone_masked=EXCLUDED.phone_masked,updated_at=EXCLUDED.updated_at`,
+		userID, phoneHash, phoneEncrypted, phoneMasked, now)
+	return translateWriteError(err, "PHONE_ALREADY_BOUND", "该手机号已绑定其他账号")
 }
 
 func (p *Postgres) CreateEvent(ctx context.Context, event domain.Event) (domain.Event, error) {
@@ -495,7 +525,7 @@ func scanRegistration(row scanner) (domain.Registration, error) {
 
 func scanUserProfile(row scanner) (domain.UserProfile, error) {
 	var profile domain.UserProfile
-	err := row.Scan(&profile.ID, &profile.Nickname, &profile.AvatarURL, &profile.Gender,
+	err := row.Scan(&profile.ID, &profile.Nickname, &profile.AvatarURL, &profile.PhoneMasked, &profile.Gender,
 		&profile.Country, &profile.Province, &profile.City, &profile.UpdatedAt)
 	return profile, err
 }

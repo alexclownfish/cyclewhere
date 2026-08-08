@@ -8,10 +8,26 @@
   <view wx:elif="{{authRequired}}" class="login-shell">
     <view class="login-hero">
       <view class="login-brand"><text class="brand-dot"></text>风迹骑行</view>
-      <view class="login-title">建立你的骑友身份</view>
-      <view class="login-copy">使用微信头像和昵称完成登录，即可报名、发布和管理骑行活动。</view>
+      <view class="login-title">登录后继续骑行</view>
+      <view class="login-copy">一次授权即可报名、发布和管理活动。</view>
     </view>
 
+    <view class="login-panel simple-login-panel">
+      <view wx:if="{{authError}}" class="login-error">
+        <view class="error-indicator">!</view>
+        <view class="error-content"><view class="error-title">登录没有完成</view><view>{{authErrorCopy}}</view></view>
+      </view>
+      <button class="button button-primary login-submit" bindtap="wechatOneTapLogin">微信一键登录</button>
+      <button class="button phone-login-submit" open-type="getPhoneNumber" bindgetphonenumber="phoneLogin">手机号快捷登录</button>
+      <view class="privacy-note"><text class="privacy-lock">✓</text>手机号仅用于账号识别和活动联系</view>
+    </view>
+  </view>
+
+  <view wx:elif="{{profileEditing}}" class="login-shell">
+    <view class="login-hero compact-edit-hero">
+      <view class="login-brand"><text class="brand-dot"></text>个人资料</view>
+      <view class="login-title">更新头像和昵称</view>
+    </view>
     <view class="login-panel">
       <view class="avatar-section">
         <button class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" aria-label="选择微信头像">
@@ -19,23 +35,15 @@
           <view wx:else class="avatar-placeholder"><text>+</text></view>
           <view class="avatar-action">+</view>
         </button>
-        <view class="avatar-label">微信头像</view>
-        <view class="avatar-help">点击头像进行选择</view>
+        <view class="avatar-label">头像</view>
       </view>
-
       <view class="form-divider"></view>
       <view class="login-field">
-        <view class="field-label">微信昵称</view>
-        <input class="nickname-input" type="nickname" maxlength="32" value="{{pendingNickname}}" bindinput="onNickname" placeholder="选择或填写微信昵称" placeholder-class="input-placeholder" />
+        <view class="field-label">昵称</view>
+        <input class="nickname-input" type="nickname" maxlength="32" value="{{pendingNickname}}" bindinput="onNickname" placeholder="填写昵称" placeholder-class="input-placeholder" />
       </view>
-
-      <view wx:if="{{authError}}" class="login-error">
-        <view class="error-indicator">!</view>
-        <view class="error-content"><view class="error-title">登录没有完成</view><view>{{authErrorCopy}}</view></view>
-      </view>
-
-      <button class="button button-primary login-submit" bindtap="completeRegistration">完成微信登录</button>
-      <view class="privacy-note"><text class="privacy-lock">✓</text>头像和昵称仅用于骑行活动中的身份展示</view>
+      <button class="button button-primary login-submit" bindtap="completeRegistration">保存资料</button>
+      <button class="button cancel-edit" bindtap="cancelEditProfile">取消</button>
     </view>
   </view>
 
@@ -65,6 +73,14 @@
       <view><text>{{registered.length}}</text><text>报名活动</text></view>
       <view><text>{{published.length}}</text><text>发布活动</text></view>
       <view><text>骑行者</text><text>当前身份</text></view>
+    </view>
+
+    <view class="phone-binding">
+      <view>
+        <view class="phone-binding-title">手机号</view>
+        <view class="phone-binding-copy">{{account.phoneMasked || '尚未绑定'}}</view>
+      </view>
+      <button class="phone-bind-button" open-type="getPhoneNumber" bindgetphonenumber="bindPhone">{{account.phoneMasked ? '更换' : '绑定'}}</button>
     </view>
 
     <view class="segment-wrap">

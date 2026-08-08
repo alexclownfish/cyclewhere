@@ -112,14 +112,15 @@ type UserRegistration struct {
 }
 
 type UserProfile struct {
-	ID        string    `json:"id"`
-	Nickname  *string   `json:"nickname"`
-	AvatarURL *string   `json:"avatarUrl"`
-	Gender    *int      `json:"gender"`
-	Country   *string   `json:"country"`
-	Province  *string   `json:"province"`
-	City      *string   `json:"city"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID          string    `json:"id"`
+	Nickname    *string   `json:"nickname"`
+	AvatarURL   *string   `json:"avatarUrl"`
+	PhoneMasked *string   `json:"phoneMasked"`
+	Gender      *int      `json:"gender"`
+	Country     *string   `json:"country"`
+	Province    *string   `json:"province"`
+	City        *string   `json:"city"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Page[T any] struct {

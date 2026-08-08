@@ -35,7 +35,8 @@ Page({
     authRequired: false,
     authError: '',
     authErrorCopy: '',
-    account: null as { id: string; nickname?: string | null; city?: string | null; avatarUrl?: string | null } | null,
+    profileEditing: false,
+    account: null as { id: string; nickname?: string | null; city?: string | null; avatarUrl?: string | null; phoneMasked?: string | null } | null,
     avatarText: '骑',
     pendingAvatarUrl: '',
     pendingNickname: '',
@@ -101,6 +102,7 @@ Page({
         authChecking: false,
         authReady: true,
         authRequired: false,
+        profileEditing: false,
         account: profile,
         avatarText: profile.nickname?.slice(0, 1) || '骑',
       });
@@ -113,6 +115,39 @@ Page({
         authError: errorMessage(error),
         authErrorCopy: friendlyAuthError(error),
       });
+    }
+  },
+  async wechatOneTapLogin() {
+    if (this.data.authChecking) return;
+    this.setData({ authChecking: true, authRequired: false, authError: '', authErrorCopy: '' });
+    try {
+      await api.login(true);
+      await this.checkLogin();
+    } catch (error) {
+      this.setData({ authChecking: false, authRequired: true, authError: errorMessage(error), authErrorCopy: friendlyAuthError(error) });
+    }
+  },
+  async phoneLogin(event: WechatMiniprogram.CustomEvent<{ code?: string }>) {
+    const code = event.detail.code;
+    if (!code) return this.setData({ authError: 'PHONE_AUTH_CANCELLED', authErrorCopy: '未完成手机号授权，可使用微信一键登录。' });
+    this.setData({ authChecking: true, authRequired: false, authError: '', authErrorCopy: '' });
+    try {
+      await api.phoneLogin(code);
+      await this.checkLogin();
+    } catch (error) {
+      this.setData({ authChecking: false, authRequired: true, authError: errorMessage(error), authErrorCopy: friendlyAuthError(error) });
+    }
+  },
+  async bindPhone(event: WechatMiniprogram.CustomEvent<{ code?: string }>) {
+    const code = event.detail.code;
+    if (!code) return;
+    try {
+      const profile = await api.bindPhone(code);
+      const account = { ...(this.data.account || { id: profile.id }), ...profile };
+      this.setData({ account });
+      wx.showToast({ title: '手机号已绑定', icon: 'success' });
+    } catch (error) {
+      wx.showToast({ title: errorMessage(error), icon: 'none' });
     }
   },
   retryAuth() { this.checkLogin(); },
@@ -139,13 +174,13 @@ Page({
   goPublish() { wx.switchTab({ url: '/pages/publish/index' }); },
   editProfile() {
     this.setData({
-      authRequired: true,
-      authReady: false,
+      profileEditing: true,
       pendingAvatarUrl: '',
       pendingNickname: this.data.account?.nickname || '',
       authError: '',
       authErrorCopy: '',
     });
   },
+  cancelEditProfile() { this.setData({ profileEditing: false }); },
   editEvent(event: WechatMiniprogram.TouchEvent) { wx.navigateTo({ url: `/pages/publish/index?id=${event.currentTarget.dataset.id}` }); },
 });

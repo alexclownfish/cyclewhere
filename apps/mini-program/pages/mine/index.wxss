@@ -34,6 +34,11 @@
 .login-submit { width: 100%; margin-top: 28rpx; border-radius: 22rpx; box-shadow: 0 12rpx 28rpx rgba(8, 127, 91, .18); }
 .privacy-note { display: flex; align-items: center; justify-content: center; gap: 8rpx; margin-top: 22rpx; color: var(--muted); font-size: 20rpx; line-height: 1.5; }
 .privacy-lock { display: flex; align-items: center; justify-content: center; width: 25rpx; height: 25rpx; border-radius: 50%; background: var(--green-soft); color: var(--green); font-size: 17rpx; font-weight: 800; }
+.simple-login-panel { padding-top: 30rpx; }
+.simple-login-panel .login-error { margin-top: 0; margin-bottom: 22rpx; }
+.phone-login-submit { width: 100%; margin-top: 18rpx; border: 1rpx solid rgba(8,127,91,.2); border-radius: 22rpx; background: #fff; color: var(--green-strong); }
+.compact-edit-hero { padding-bottom: 76rpx; }
+.cancel-edit { width: 100%; margin-top: 14rpx; border-radius: 22rpx; background: transparent; color: var(--muted); }
 
 .auth-error-state { min-height: 100vh; padding: 174rpx 48rpx 80rpx; text-align: center; background: #fff; }
 .error-halo { display: flex; align-items: center; justify-content: center; width: 142rpx; height: 142rpx; margin: 0 auto 30rpx; border-radius: 44rpx; background: var(--red-soft); }
@@ -58,6 +63,10 @@
 .profile-summary view:last-child { border-right: 0; }
 .profile-summary text { display: block; overflow: hidden; color: var(--ink); font-size: 27rpx; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .profile-summary text + text { margin-top: 5rpx; color: var(--muted); font-size: 19rpx; font-weight: 500; }
+.phone-binding { display: flex; align-items: center; justify-content: space-between; padding: 22rpx 30rpx 26rpx; border-top: 1rpx solid var(--line); background: #fff; }
+.phone-binding-title { color: var(--ink); font-size: 25rpx; font-weight: 700; }
+.phone-binding-copy { margin-top: 5rpx; color: var(--muted); font-size: 21rpx; }
+.phone-bind-button { min-width: 112rpx; min-height: 58rpx; margin: 0; padding: 0 22rpx; border-radius: 29rpx; background: var(--green-soft); color: var(--green-strong); font-size: 22rpx; font-weight: 700; line-height: 58rpx; }
 .segment-wrap { position: sticky; z-index: 3; top: 0; padding: 18rpx 28rpx; background: rgba(243, 247, 245, .94); backdrop-filter: blur(20px); }
 .segment { display: grid; grid-template-columns: 1fr 1fr; padding: 6rpx; border: 1rpx solid rgba(60, 60, 67, .08); border-radius: 16rpx; background: rgba(118, 118, 128, .1); }
 .segment-button { min-height: 72rpx; margin: 0; border-radius: 13rpx; background: transparent; color: var(--muted); font-size: 24rpx; line-height: 72rpx; }

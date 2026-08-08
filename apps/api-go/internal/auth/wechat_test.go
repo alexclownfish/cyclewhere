@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,36 @@ func TestStableUserID(t *testing.T) {
 	}
 	if first != "f7e966a5-221b-50f6-b03c-0d9cde506a05" {
 		t.Fatalf("StableUserID() = %q; Node compatibility changed", first)
+	}
+}
+
+func TestWeChatPhoneGatewayExchangesOfficialPhoneCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			if r.URL.Query().Get("grant_type") != "client_credential" {
+				t.Fatalf("unexpected token query: %v", r.URL.Query())
+			}
+			_, _ = w.Write([]byte(`{"access_token":"access-token","expires_in":7200}`))
+			return
+		}
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body["code"] != "phone-code" || r.URL.Query().Get("access_token") != "access-token" {
+			t.Fatalf("unexpected phone request: query=%v body=%v err=%v", r.URL.Query(), body, err)
+		}
+		_, _ = w.Write([]byte(`{"errcode":0,"phone_info":{"purePhoneNumber":"13800138000"}}`))
+	}))
+	defer server.Close()
+
+	gateway, err := NewWeChatHTTPGatewayWithClient("app", "secret", server.Client(), server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway.tokenEndpoint = server.URL
+	gateway.phoneEndpoint = server.URL
+	phone, err := gateway.ExchangePhone(context.Background(), "phone-code")
+	if err != nil || phone != "13800138000" {
+		t.Fatalf("ExchangePhone() = %q, %v", phone, err)
 	}
 }
 

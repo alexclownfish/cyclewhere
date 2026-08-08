@@ -1,0 +1,20 @@
+page { background: #f4faf7; }
+.login-page { box-sizing: border-box; display: flex; min-height: 100vh; flex-direction: column; align-items: center; padding: 150rpx 48rpx calc(48rpx + env(safe-area-inset-bottom)); background: #f4faf7; color: #14231d; }
+.brand-mark { position: relative; width: 186rpx; height: 140rpx; margin-top: 28rpx; }
+.brand-road { position: absolute; top: 12rpx; left: 50%; width: 74rpx; height: 112rpx; border-radius: 18rpx 18rpx 46rpx 46rpx; background: #0a875f; transform: translateX(-50%) perspective(90rpx) rotateX(8deg); }
+.brand-road::after { position: absolute; top: 18rpx; left: 34rpx; width: 6rpx; height: 62rpx; border-radius: 4rpx; background: rgba(255,255,255,.82); content: ""; }
+.brand-wheel { position: absolute; bottom: 0; width: 66rpx; height: 66rpx; border: 8rpx solid #14231d; border-radius: 50%; background: #f4faf7; }
+.wheel-left { left: 0; }
+.wheel-right { right: 0; }
+.brand-name { margin-top: 30rpx; font-size: 52rpx; font-weight: 800; letter-spacing: 0; }
+.brand-copy { margin-top: 16rpx; color: #63726c; font-size: 25rpx; letter-spacing: 0; }
+.login-actions { width: 100%; margin-top: auto; }
+.wechat-button, .phone-button { display: flex; align-items: center; justify-content: center; gap: 18rpx; width: 100%; min-height: 96rpx; margin: 0; border-radius: 18rpx; font-size: 29rpx; font-weight: 700; line-height: 96rpx; }
+.wechat-button { background: #087f5b; color: #fff; box-shadow: 0 14rpx 30rpx rgba(8,127,91,.2); }
+.phone-button { margin-top: 20rpx; border: 1rpx solid rgba(8,127,91,.2); background: rgba(255,255,255,.9); color: #087f5b; }
+.wechat-icon, .phone-icon { display: flex; align-items: center; justify-content: center; width: 44rpx; height: 44rpx; border-radius: 50%; font-size: 22rpx; font-weight: 800; line-height: 44rpx; }
+.wechat-icon { background: rgba(255,255,255,.18); color: #fff; }
+.phone-icon { background: #e4f4ed; color: #087f5b; font-size: 30rpx; }
+.login-error { margin-top: 22rpx; padding: 18rpx 22rpx; border-radius: 14rpx; background: #fff0ef; color: #b42318; font-size: 23rpx; line-height: 1.55; text-align: center; }
+.privacy-copy { max-width: 610rpx; margin-top: 30rpx; color: #8a9691; font-size: 20rpx; line-height: 1.6; text-align: center; }
+button::after { border: 0; }

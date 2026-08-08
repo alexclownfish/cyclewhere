@@ -31,6 +31,7 @@ Page({
         authRequired: false,
         authError: '',
         authErrorCopy: '',
+        profileEditing: false,
         account: null,
         avatarText: '骑',
         pendingAvatarUrl: '',
@@ -100,6 +101,7 @@ Page({
                 authChecking: false,
                 authReady: true,
                 authRequired: false,
+                profileEditing: false,
                 account: profile,
                 avatarText: profile.nickname?.slice(0, 1) || '骑',
             });
@@ -113,6 +115,45 @@ Page({
                 authError: (0, presentation_1.errorMessage)(error),
                 authErrorCopy: friendlyAuthError(error),
             });
+        }
+    },
+    async wechatOneTapLogin() {
+        if (this.data.authChecking)
+            return;
+        this.setData({ authChecking: true, authRequired: false, authError: '', authErrorCopy: '' });
+        try {
+            await api_1.api.login(true);
+            await this.checkLogin();
+        }
+        catch (error) {
+            this.setData({ authChecking: false, authRequired: true, authError: (0, presentation_1.errorMessage)(error), authErrorCopy: friendlyAuthError(error) });
+        }
+    },
+    async phoneLogin(event) {
+        const code = event.detail.code;
+        if (!code)
+            return this.setData({ authError: 'PHONE_AUTH_CANCELLED', authErrorCopy: '未完成手机号授权，可使用微信一键登录。' });
+        this.setData({ authChecking: true, authRequired: false, authError: '', authErrorCopy: '' });
+        try {
+            await api_1.api.phoneLogin(code);
+            await this.checkLogin();
+        }
+        catch (error) {
+            this.setData({ authChecking: false, authRequired: true, authError: (0, presentation_1.errorMessage)(error), authErrorCopy: friendlyAuthError(error) });
+        }
+    },
+    async bindPhone(event) {
+        const code = event.detail.code;
+        if (!code)
+            return;
+        try {
+            const profile = await api_1.api.bindPhone(code);
+            const account = { ...(this.data.account || { id: profile.id }), ...profile };
+            this.setData({ account });
+            wx.showToast({ title: '手机号已绑定', icon: 'success' });
+        }
+        catch (error) {
+            wx.showToast({ title: (0, presentation_1.errorMessage)(error), icon: 'none' });
         }
     },
     retryAuth() { this.checkLogin(); },
@@ -141,13 +182,13 @@ Page({
     goPublish() { wx.switchTab({ url: '/pages/publish/index' }); },
     editProfile() {
         this.setData({
-            authRequired: true,
-            authReady: false,
+            profileEditing: true,
             pendingAvatarUrl: '',
             pendingNickname: this.data.account?.nickname || '',
             authError: '',
             authErrorCopy: '',
         });
     },
+    cancelEditProfile() { this.setData({ profileEditing: false }); },
     editEvent(event) { wx.navigateTo({ url: `/pages/publish/index?id=${event.currentTarget.dataset.id}` }); },
 });

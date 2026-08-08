@@ -28,6 +28,8 @@ export class ApiError extends Error {
 
 export interface ClientApi {
   login(forceRefresh?: boolean): Promise<void>;
+  phoneLogin(phoneCode: string): Promise<void>;
+  bindPhone(phoneCode: string): Promise<UserProfile>;
   registerProfile(nickname: string, avatarFilePath: string, forceRefresh?: boolean): Promise<UserProfile>;
   listEvents(): Promise<RideEvent[]>;
   getEvent(id: string): Promise<RideEvent>;
@@ -152,6 +154,27 @@ export function createRealApi(transport: Transport, currentUser: UserProvider, a
   return {
     async login(forceRefresh = false) {
       await authHeaders(forceRefresh);
+    },
+    async phoneLogin(phoneCode) {
+      if (typeof wx === 'undefined') throw new ApiError('微信环境不可用', 0, 'WX_UNAVAILABLE');
+      const result = await transport<LoginResult>({
+        url: '/api/v1/auth/wechat/phone-login', method: 'POST',
+        data: { loginCode: await wechatLogin(), phoneCode },
+      });
+      wx.setStorageSync('auth_token', result.accessToken);
+      wx.setStorageSync('demo_account', result.user.profile
+        ? { ...result.user.profile, id: result.user.id }
+        : { id: result.user.id, nickname: '微信骑友', city: '' });
+    },
+    async bindPhone(phoneCode) {
+      const result = await protectedRequest<{ profile: UserProfile }>({
+        url: '/api/v1/me/phone', method: 'POST', data: { code: phoneCode },
+      });
+      if (typeof wx !== 'undefined') {
+        const current = wx.getStorageSync('demo_account') || {};
+        wx.setStorageSync('demo_account', { ...current, ...result.profile });
+      }
+      return result.profile;
     },
     async registerProfile(nickname, avatarFilePath, forceRefresh = false) {
       await authHeaders(forceRefresh);
@@ -346,6 +369,8 @@ const realApi = createRealApi(
 export const api: ClientApi = USE_MOCK ? {
   ...mockApi,
   login: async () => undefined,
+  phoneLogin: async () => undefined,
+  bindPhone: async () => ({ id: 'mock-user', nickname: '微信骑友', avatarUrl: null, phoneMasked: '138****8000', city: '' }),
   registerProfile: async (nickname) => ({ id: 'mock-user', nickname, avatarUrl: null, city: '' }),
   register: (eventId, input) => mockApi.register(eventId, input),
 } : realApi;
