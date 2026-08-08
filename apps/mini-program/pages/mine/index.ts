@@ -30,6 +30,8 @@ Page({
     active: 'registered',
     loading: false,
     error: '',
+    registeredError: '',
+    publishedError: '',
     authChecking: true,
     authReady: false,
     authRequired: false,
@@ -153,22 +155,27 @@ Page({
   retryAuth() { this.checkLogin(); },
   async loadMine() {
     if (!this.data.authReady) return;
-    this.setData({ loading: true, error: '' });
-    try {
-      const [events, records] = await Promise.all([api.listEvents(), api.getMyRegistrationRecords()]);
-      const registered = records.map(({ registration, event }) => {
+    this.setData({ loading: true, error: '', registeredError: '', publishedError: '' });
+    const [eventsResult, recordsResult] = await Promise.allSettled([api.listEvents(), api.getMyRegistrationRecords()]);
+    const registered = recordsResult.status === 'fulfilled'
+      ? recordsResult.value.map(({ registration, event }) => {
         const status = statusMap[registration.status];
         return { ...event, dateText: formatRideDate(event.startAt), statusText: status.text, statusTone: status.tone };
-      }) as MyEventView[];
-      const published = events
+      }) as MyEventView[]
+      : [];
+    const published = eventsResult.status === 'fulfilled'
+      ? eventsResult.value
         .filter((item) => item.ownedByMe)
-        .map((item) => ({ ...item, dateText: formatRideDate(item.startAt), statusText: '已发布', statusTone: 'badge-green' }));
-      this.setData({ registered, published, loading: false });
-    } catch (error) {
-      this.setData({ loading: false, error: errorMessage(error) });
-    }
+        .map((item) => ({ ...item, dateText: formatRideDate(item.startAt), statusText: '已发布', statusTone: 'badge-green' }))
+      : [];
+    const registeredError = recordsResult.status === 'rejected' ? errorMessage(recordsResult.reason) : '';
+    const publishedError = eventsResult.status === 'rejected' ? errorMessage(eventsResult.reason) : '';
+    this.setData({ registered, published, registeredError, publishedError, loading: false, error: this.data.active === 'registered' ? registeredError : publishedError });
   },
-  switchSegment(event: WechatMiniprogram.TouchEvent) { this.setData({ active: event.currentTarget.dataset.value }); },
+  switchSegment(event: WechatMiniprogram.TouchEvent) {
+    const active = event.currentTarget.dataset.value as 'registered' | 'published';
+    this.setData({ active, error: active === 'registered' ? this.data.registeredError : this.data.publishedError });
+  },
   openEvent(event: WechatMiniprogram.TouchEvent) { wx.navigateTo({ url: `/pages/event-detail/index?id=${event.currentTarget.dataset.id}` }); },
   goExplore() { wx.switchTab({ url: '/pages/events/index' }); },
   goPublish() { wx.switchTab({ url: '/pages/publish/index' }); },

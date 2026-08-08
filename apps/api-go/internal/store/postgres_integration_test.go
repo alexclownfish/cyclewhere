@@ -27,9 +27,10 @@ func TestPostgresRegistrationIsIdempotentAndDoesNotOversell(t *testing.T) {
 	repository := NewPostgres(pool)
 	eventID := uuid.NewString()
 	organizerID := uuid.NewString()
+	coverURL := "https://example.com/event-cover.jpg"
 	now := time.Date(2026, 8, 6, 3, 0, 0, 0, time.UTC)
 	event := domain.Event{
-		ID: eventID, OrganizerID: organizerID, Title: "PostgreSQL capacity integration",
+		ID: eventID, OrganizerID: organizerID, Title: "PostgreSQL capacity integration", CoverURL: &coverURL,
 		Summary: "Exercises durable row locking with competing registration requests.",
 		StartAt: now.Add(72 * time.Hour), RegistrationDeadline: now.Add(48 * time.Hour),
 		MeetingPoint: "Integration test start", Difficulty: domain.DifficultyModerate,
@@ -58,6 +59,13 @@ func TestPostgresRegistrationIsIdempotentAndDoesNotOversell(t *testing.T) {
 	}
 	if first.Replayed || !replay.Replayed || replay.Registration.ID != first.Registration.ID {
 		t.Fatalf("unexpected idempotency results: first=%+v replay=%+v", first, replay)
+	}
+	registrations, err := repository.ListRegistrationsByUser(ctx, firstCommand.UserID)
+	if err != nil {
+		t.Fatalf("list user registrations: %v", err)
+	}
+	if len(registrations) != 1 || registrations[0].Event.CoverURL == nil || *registrations[0].Event.CoverURL != coverURL {
+		t.Fatalf("registration event did not preserve cover: %+v", registrations)
 	}
 	staleUpdate := event
 	staleUpdate.Title = "A stale organizer update"

@@ -444,11 +444,8 @@ func (p *Postgres) ListRegistrationsByUser(ctx context.Context, userID string) (
 	rows, err := p.pool.Query(ctx, `SELECT
     r.id,r.event_id,r.user_id,r.status,r.ability_confirmed,r.equipment_confirmed,
     r.waiver_version,r.waiver_accepted_at,r.created_at,r.updated_at,r.cancelled_at,
-    e.id,e.organizer_id,e.roadbook_id,e.title,e.summary,e.start_at,e.registration_deadline,
-    e.meeting_point,e.difficulty,e.distance_km,e.elevation_gain_m,e.speed_min_kph,
-    e.speed_max_kph,e.capacity,e.registration_count,e.equipment_requirements,
-    e.ability_requirements,e.safety_notice,e.status,e.created_at,e.updated_at,e.version
-    FROM registrations r JOIN events e ON e.id=r.event_id WHERE r.user_id=$1
+    e.*
+    FROM registrations r JOIN (SELECT `+eventColumns+` FROM events) e ON e.id=r.event_id WHERE r.user_id=$1
     ORDER BY e.start_at DESC,r.updated_at DESC`, userID)
 	if err != nil {
 		return nil, err
