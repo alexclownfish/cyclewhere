@@ -67,3 +67,37 @@ test('only the organizer can open a rider contact from the participant grid', as
     api.getEventParticipantContact = original;
   }
 });
+
+test('organizer can cancel an active event and jump to the participant list', async () => {
+  const original = api.cancelEvent;
+  let cancelledEvent = '';
+  let reloaded = 0;
+  let scrollSelector = '';
+  api.cancelEvent = async (eventId) => { cancelledEvent = eventId; };
+  (globalThis as any).wx = {
+    showModal: async () => ({ confirm: true, cancel: false }),
+    showToast: () => undefined,
+    pageScrollTo: ({ selector }: { selector: string }) => { scrollSelector = selector; },
+  };
+
+  try {
+    const page = createPage();
+    page.data.id = '11111111-1111-4111-8111-111111111111';
+    page.data.event = { ownedByMe: true, status: 'published' };
+    page.loadDetail = async () => { reloaded += 1; };
+    await page.cancelEvent();
+    assert.equal(cancelledEvent, page.data.id);
+    assert.equal(reloaded, 1);
+    assert.equal(page.data.eventCancelling, false);
+
+    page.viewParticipants();
+    assert.equal(scrollSelector, '#participant-list');
+
+    cancelledEvent = '';
+    page.data.event = { ownedByMe: false, status: 'published' };
+    await page.cancelEvent();
+    assert.equal(cancelledEvent, '');
+  } finally {
+    api.cancelEvent = original;
+  }
+});

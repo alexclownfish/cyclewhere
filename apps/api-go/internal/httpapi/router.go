@@ -124,6 +124,7 @@ func NewRouter(deps Dependencies) (*gin.Engine, error) {
 	protected.POST("/events", api.createEvent)
 	protected.POST("/events/:id/cover/base64", api.uploadEventCoverBase64)
 	protected.POST("/events/:id/publish", api.publishEvent)
+	protected.POST("/events/:id/cancel", api.cancelEvent)
 	protected.PATCH("/events/:id", api.updateEvent)
 	protected.PUT("/events/:id", api.updateEvent)
 	protected.POST("/routes", api.createRoadbook)
@@ -953,6 +954,19 @@ func (a *API) publishEvent(c *gin.Context) {
 		return
 	}
 	event, err := a.catalog.PublishEvent(c.Request.Context(), c.Param("id"), userID(c))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, data(eventResponse(event)))
+}
+
+func (a *API) cancelEvent(c *gin.Context) {
+	if !validID(c.Param("id")) {
+		writeValidation(c)
+		return
+	}
+	event, err := a.catalog.CancelEvent(c.Request.Context(), c.Param("id"), userID(c))
 	if err != nil {
 		writeError(c, err)
 		return

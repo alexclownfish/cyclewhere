@@ -41,6 +41,7 @@ export interface ClientApi {
   getMyRegistrationRecords(): Promise<MyRegistrationRecord[]>;
   register(eventId: string, input: RegistrationInput, idempotencyKey: string): Promise<Registration>;
   cancelRegistration(eventId: string): Promise<void>;
+  cancelEvent(eventId: string): Promise<void>;
   publish(input: PublishEventInput): Promise<RideEvent>;
   updateEvent(id: string, input: PublishEventInput): Promise<RideEvent>;
   getProfile(): Promise<UserProfile | null>;
@@ -269,6 +270,9 @@ export function createRealApi(transport: Transport, currentUser: UserProvider, a
     },
     async cancelRegistration(eventId) {
       await protectedRequest<BackendRegistrationResult>({ url: `/api/v1/events/${eventId}/registrations/me`, method: 'DELETE' });
+    },
+    async cancelEvent(eventId) {
+      await protectedRequest<BackendEvent>({ url: `/api/v1/events/${eventId}/cancel`, method: 'POST' });
     },
     async publish(input) {
       const route = input.routeId

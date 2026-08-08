@@ -21,7 +21,7 @@ Page({
   data: {
     id: '', loading: true, error: '', event: null as RideEvent | null,
     dateText: '', remaining: 0, bikeTypesText: '', statusText: '', registration: null as Registration | null, organizerInitial: '组',
-    canRegisterNow: false, actionText: '报名参加', cancelling: false,
+    canRegisterNow: false, actionText: '报名参加', cancelling: false, eventCancelling: false,
     participants: [] as ParticipantView[], participantsLoading: false, participantsError: '',
     participantLoadGeneration: 0,
   },
@@ -49,7 +49,7 @@ Page({
       this.setData({
         event, registration, loading: false, dateText: formatRideDate(event.startAt), remaining: remainingPlaces(event), organizerInitial: event.organizer.slice(0, 1) || '组',
         bikeTypesText: event.requirements.bikeTypes.join(' / '),
-        statusText: event.status === 'full' ? '名额已满' : event.status === 'completed' ? '已结束' : deadlineClosed ? '报名已截止' : '报名中',
+        statusText: event.status === 'cancelled' ? '活动已取消' : event.status === 'full' ? '名额已满' : event.status === 'completed' ? '已结束' : deadlineClosed ? '报名已截止' : '报名中',
         canRegisterNow, actionText, participants: participantState.items,
         participantsLoading: false, participantsError: participantState.error,
       });
@@ -93,6 +93,26 @@ Page({
     if (this.data.registration) return wx.switchTab({ url: '/pages/mine/index' });
     if (!this.data.canRegisterNow) return wx.showToast({ title: '当前不可报名', icon: 'none' });
     wx.navigateTo({ url: `/pages/register/index?eventId=${this.data.id}` });
+  },
+  viewParticipants() {
+    wx.pageScrollTo({ selector: '#participant-list', duration: 280 });
+  },
+  async cancelEvent() {
+    if (!this.data.event?.ownedByMe || (this.data.event.status !== 'published' && this.data.event.status !== 'full')) return;
+    const result = await wx.showModal({
+      title: '确认取消活动？',
+      content: '取消后活动将停止报名并从公开活动中下架，此操作不可恢复。',
+      confirmText: '取消活动',
+      confirmColor: '#d9433b',
+    });
+    if (!result.confirm) return;
+    this.setData({ eventCancelling: true });
+    try {
+      await api.cancelEvent(this.data.id);
+      wx.showToast({ title: '活动已取消', icon: 'success' });
+      await this.loadDetail();
+    } catch (error) { wx.showToast({ title: errorMessage(error), icon: 'none' }); }
+    finally { this.setData({ eventCancelling: false }); }
   },
   async cancelRegistration() {
     const result = await wx.showModal({ title: '确认取消报名？', content: '取消后名额将立即释放，请确认行程后操作。', confirmColor: '#d9433b' });

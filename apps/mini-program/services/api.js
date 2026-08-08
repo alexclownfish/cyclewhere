@@ -231,6 +231,9 @@ function createRealApi(transport, currentUser, authHeaders) {
         async cancelRegistration(eventId) {
             await protectedRequest({ url: `/api/v1/events/${eventId}/registrations/me`, method: 'DELETE' });
         },
+        async cancelEvent(eventId) {
+            await protectedRequest({ url: `/api/v1/events/${eventId}/cancel`, method: 'POST' });
+        },
         async publish(input) {
             const route = input.routeId
                 ? (0, api_contract_1.mapRoadbook)(await transport({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' }))

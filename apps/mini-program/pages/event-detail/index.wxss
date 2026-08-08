@@ -50,4 +50,6 @@
 .risk { display: flex; padding: 20rpx; border-radius: 18rpx; background: rgba(255,149,0,.12); color: #784e08; font-size: 24rpx; line-height: 1.6; }
 .risk-mark { flex: 0 0 auto; margin-right: 14rpx; font-weight: 800; }
 .cancel { max-width: 210rpx; }
+.owner-cancel { flex: 0 0 210rpx; }
+.owner-participants { min-width: 0; }
 .sticky-actions { background: rgba(247,251,249,.9); -webkit-backdrop-filter: blur(24rpx); backdrop-filter: blur(24rpx); }

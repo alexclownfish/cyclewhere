@@ -506,6 +506,33 @@ func TestEventDetailUsesOrganizerProfileWithoutExposingOrganizerID(t *testing.T)
 	}
 }
 
+func TestOrganizerCanCancelPublishedEvent(t *testing.T) {
+	const eventID = "55555555-5555-4555-8555-555555555555"
+	event := contractEvent()
+	event.ID = eventID
+	repository := &fakeRepository{events: []domain.Event{event}}
+	router, issuer, _, _ := newContractRouter(t, repository, t.TempDir())
+	path := "/api/v1/events/" + eventID + "/cancel"
+
+	unauthorized := perform(router, http.MethodPost, path, "", "")
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized status = %d, body = %s", unauthorized.Code, unauthorized.Body.String())
+	}
+	forbidden := perform(router, http.MethodPost, path, "", authHeader(t, issuer, "other-user"))
+	if forbidden.Code != http.StatusForbidden {
+		t.Fatalf("non-organizer status = %d, body = %s", forbidden.Code, forbidden.Body.String())
+	}
+
+	response := perform(router, http.MethodPost, path, "", authHeader(t, issuer, event.OrganizerID))
+	if response.Code != http.StatusOK {
+		t.Fatalf("organizer status = %d, body = %s", response.Code, response.Body.String())
+	}
+	cancelled := nestedObject(t, decodeObject(t, response)["data"], "data")
+	if cancelled["status"] != string(domain.EventCancelled) || cancelled["version"] != float64(event.Version+1) {
+		t.Fatalf("cancelled event = %#v", cancelled)
+	}
+}
+
 func TestOrganizerCanReadRegistrantContactButOtherUsersCannot(t *testing.T) {
 	eventID := "33333333-3333-4333-8333-333333333333"
 	participantID := "44444444-4444-4444-8444-444444444444"

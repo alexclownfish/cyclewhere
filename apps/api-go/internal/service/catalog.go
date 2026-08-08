@@ -159,6 +159,26 @@ func (s *Catalog) PublishEvent(ctx context.Context, id, organizerID string) (dom
 	return s.repository.UpdateEvent(ctx, *event)
 }
 
+func (s *Catalog) CancelEvent(ctx context.Context, id, organizerID string) (domain.Event, error) {
+	event, err := s.GetEvent(ctx, id)
+	if err != nil {
+		return domain.Event{}, err
+	}
+	if event.OrganizerID != organizerID {
+		return domain.Event{}, domain.Forbidden("仅活动组织者可以取消活动")
+	}
+	if event.Status == domain.EventCancelled {
+		return *event, nil
+	}
+	if event.Status != domain.EventPublished && event.Status != domain.EventFull {
+		return domain.Event{}, domain.InvalidState("只有已发布的活动可以取消")
+	}
+	event.Status = domain.EventCancelled
+	event.UpdatedAt = s.clock().UTC()
+	event.Version++
+	return s.repository.UpdateEvent(ctx, *event)
+}
+
 func (s *Catalog) UpdateEvent(ctx context.Context, id, organizerID string, patch EventPatch) (domain.Event, error) {
 	event, err := s.GetEvent(ctx, id)
 	if err != nil {

@@ -179,6 +179,18 @@ test('organizer contact adapter uses the protected event participant endpoint', 
   assert.equal(calls[0].header?.Authorization, 'Bearer verified-test-token');
 });
 
+test('organizer cancellation uses the protected event cancel endpoint', async () => {
+  const calls: RequestSpec[] = [];
+  const transport: Transport = async <T>(spec: RequestSpec) => {
+    calls.push(spec);
+    return { ...backendEvent, status: 'cancelled' } as T;
+  };
+  await createRealApi(transport, 'organizer-demo', auth).cancelEvent('event-1');
+  assert.equal(calls[0].url, '/api/v1/events/event-1/cancel');
+  assert.equal(calls[0].method, 'POST');
+  assert.equal(calls[0].header?.Authorization, 'Bearer verified-test-token');
+});
+
 test('protected request refreshes a rejected bearer token once', async () => {
   const refreshFlags: Array<boolean | undefined> = [];
   let requestCount = 0;

@@ -140,6 +140,32 @@ func TestUpdateEventEnforcesOwnershipAndRegistrationRestrictions(t *testing.T) {
 	}
 }
 
+func TestCancelEventRequiresOrganizerAndPublishedState(t *testing.T) {
+	repository := newTestRepository()
+	event := fixtureEvent()
+	repository.events[event.ID] = event
+	catalog := NewCatalog(repository, func() time.Time { return fixedNow.Add(time.Hour) })
+
+	_, err := catalog.CancelEvent(context.Background(), event.ID, "other-user")
+	var domainError *domain.Error
+	if !errors.As(err, &domainError) || domainError.Code != "FORBIDDEN" {
+		t.Fatalf("expected FORBIDDEN, got %v", err)
+	}
+
+	cancelled, err := catalog.CancelEvent(context.Background(), event.ID, event.OrganizerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cancelled.Status != domain.EventCancelled || cancelled.Version != event.Version+1 || !cancelled.UpdatedAt.Equal(fixedNow.Add(time.Hour)) {
+		t.Fatalf("unexpected cancelled event: %+v", cancelled)
+	}
+
+	replayed, err := catalog.CancelEvent(context.Background(), event.ID, event.OrganizerID)
+	if err != nil || replayed.Version != cancelled.Version {
+		t.Fatalf("idempotent cancel changed event: event=%+v err=%v", replayed, err)
+	}
+}
+
 func TestRegisterValidatesIdempotencyAndConfirmations(t *testing.T) {
 	repository := newTestRepository()
 	catalog := NewCatalog(repository, func() time.Time { return fixedNow })

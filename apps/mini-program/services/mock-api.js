@@ -102,6 +102,17 @@ exports.mockApi = {
         saveEvents(allEvents);
         await delay(undefined);
     },
+    async cancelEvent(eventId) {
+        const allEvents = loadEvents();
+        const event = allEvents.find((item) => item.id === eventId);
+        if (!event || !event.ownedByMe)
+            throw new Error('仅活动组织者可以取消活动');
+        if (event.status !== 'published' && event.status !== 'full')
+            throw new Error('只有已发布的活动可以取消');
+        event.status = 'cancelled';
+        saveEvents(allEvents);
+        await delay(undefined);
+    },
     async publish(input) {
         const route = mock_data_1.routes.find((item) => item.id === input.routeId) || mock_data_1.routes[1];
         const event = {

@@ -12,7 +12,7 @@
       <view class="section-kicker">RIDE PLAN</view><view class="form-title">出发信息</view>
       <view class="info-grid"><view class="info"><text class="info-label">时间</text><text>{{dateText}}</text></view><view class="info"><text class="info-label">集合</text><text>{{event.meetingPoint}}</text></view><view class="info"><text class="info-label">巡航</text><text>{{event.speedRange}}</text></view><view class="info"><text class="info-label">规模</text><text>{{event.registeredCount}} / {{event.capacity}} 人</text></view></view>
     </view>
-    <view class="detail-section participants-section">
+    <view id="participant-list" class="detail-section participants-section">
       <view class="participants-heading">
         <view><view class="section-kicker">RIDERS</view><view class="form-title">一起出发的骑友</view></view>
         <view class="participant-count">{{participants.length}} 位同行</view>
@@ -52,8 +52,14 @@
     </view>
     <view class="detail-section"><view class="section-kicker">ABOUT</view><view class="form-title">活动说明</view><view class="description">{{event.description}}</view></view>
     <view class="sticky-actions">
-      <button wx:if="{{registration}}" class="button button-plain cancel" loading="{{cancelling}}" bindtap="cancelRegistration">取消报名</button>
-      <button class="button button-primary" disabled="{{!registration && !canRegisterNow}}" bindtap="handlePrimary">{{actionText}}</button>
+      <block wx:if="{{event.ownedByMe}}">
+        <button class="button button-plain cancel owner-cancel" disabled="{{event.status === 'cancelled' || event.status === 'completed'}}" loading="{{eventCancelling}}" bindtap="cancelEvent">{{event.status === 'cancelled' ? '活动已取消' : '取消活动'}}</button>
+        <button class="button button-primary owner-participants" bindtap="viewParticipants">查看已报名用户</button>
+      </block>
+      <block wx:else>
+        <button wx:if="{{registration}}" class="button button-plain cancel" loading="{{cancelling}}" bindtap="cancelRegistration">取消报名</button>
+        <button class="button button-primary" disabled="{{!registration && !canRegisterNow}}" bindtap="handlePrimary">{{actionText}}</button>
+      </block>
     </view>
   </block>
 </view>
