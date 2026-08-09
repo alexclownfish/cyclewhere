@@ -86,7 +86,7 @@ Page({
             this.setData({ authChecking: false, authReady: false, authError: (0, presentation_1.errorMessage)(error) });
         }
     },
-    authorizeLogin() { wx.switchTab({ url: '/pages/mine/index' }); },
+    authorizeLogin() { wx.navigateTo({ url: '/pages/privacy/index?intent=publish' }); },
     async loadRoutes() {
         this.setData({ routesError: '' });
         try {

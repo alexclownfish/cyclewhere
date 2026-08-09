@@ -7,7 +7,7 @@
 
   <view wx:elif="{{authRequired}}" class="login-shell">
     <view class="login-hero">
-      <view class="login-brand"><text class="brand-dot"></text>风迹骑行</view>
+      <view class="login-brand"><text class="brand-dot"></text>骑哪儿</view>
       <view class="login-title">登录后继续骑行</view>
       <view class="login-copy">一次授权即可报名、发布和管理活动。</view>
     </view>
@@ -17,9 +17,8 @@
         <view class="error-indicator">!</view>
         <view class="error-content"><view class="error-title">登录没有完成</view><view>{{authErrorCopy}}</view></view>
       </view>
-      <button class="button button-primary login-submit" bindtap="wechatOneTapLogin">微信一键登录</button>
-      <button class="button phone-login-submit" open-type="getPhoneNumber" bindgetphonenumber="phoneLogin">手机号快捷登录</button>
-      <view class="privacy-note"><text class="privacy-lock">✓</text>手机号仅用于账号识别和活动联系</view>
+      <button class="button button-primary login-submit" bindtap="wechatOneTapLogin">查看隐私政策并登录</button>
+      <view class="privacy-note"><text class="privacy-lock">✓</text>同意后才会请求微信头像与昵称</view>
     </view>
   </view>
 

@@ -1,0 +1,38 @@
+<view class="privacy-page">
+  <view wx:if="{{stage === 'consent'}}" class="consent-screen">
+    <view class="hero">
+      <view class="brand-mark"><view class="mark-road"></view><view class="mark-wheel mark-wheel-left"></view><view class="mark-wheel mark-wheel-right"></view></view>
+      <view class="brand-name">骑哪儿</view>
+      <view class="brand-copy">发现活动，共享路书，和骑友一起出发</view>
+    </view>
+    <view class="privacy-sheet">
+      <view class="sheet-handle"></view>
+      <view class="sheet-title">欢迎光临</view>
+      <view class="sheet-subtitle">请先阅读隐私政策声明</view>
+      <view class="policy-copy">为了提供活动报名、发布和骑友联系服务，只有在你同意后，我们才会请求微信头像和昵称，用于创建骑行身份。</view>
+      <view class="policy-link">《骑哪儿隐私政策》</view>
+      <view wx:if="{{error}}" class="privacy-error">{{error}}</view>
+      <view class="consent-actions">
+        <button class="browse-button" disabled="{{loading}}" bindtap="browse">仅浏览</button>
+        <button class="agree-button" loading="{{loading}}" disabled="{{loading}}" bindtap="agree">同意并继续</button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:else class="profile-screen">
+    <view class="profile-top"><view class="profile-kicker">已同意隐私政策</view><view class="profile-title">设置微信骑行身份</view><view class="profile-copy">头像和昵称仅展示给活动骑友与组织者。</view></view>
+    <view class="profile-card">
+      <button class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="chooseAvatar" aria-label="选择微信头像">
+        <image wx:if="{{pendingAvatarUrl}}" src="{{pendingAvatarUrl}}" mode="aspectFill" />
+        <view wx:else class="avatar-placeholder">+</view>
+        <view class="avatar-badge">+</view>
+      </button>
+      <view class="avatar-label">选择微信头像</view>
+      <view class="field-label">微信昵称</view>
+      <input class="nickname-input" type="nickname" maxlength="32" value="{{pendingNickname}}" bindinput="onNickname" placeholder="请选择或填写昵称" placeholder-class="input-placeholder" />
+      <view wx:if="{{error}}" class="privacy-error">{{error}}</view>
+      <button class="complete-button" loading="{{loading}}" disabled="{{loading}}" bindtap="completeProfile">完成并进入骑哪儿</button>
+      <button class="back-button" disabled="{{loading}}" bindtap="backToConsent">返回</button>
+    </view>
+  </view>
+</view>

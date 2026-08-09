@@ -2,7 +2,7 @@
   "name": "fengji-cycling",
   "version": "0.1.0",
   "private": true,
-  "description": "风迹公路骑行活动小程序 MVP",
+  "description": "骑哪儿公路骑行活动小程序 MVP",
   "scripts": {
     "setup": "npm --prefix apps/api install --workspaces=false && npm --prefix apps/mini-program install --workspaces=false",
     "build": "npm --prefix apps/api run build && npm --prefix apps/mini-program run typecheck",

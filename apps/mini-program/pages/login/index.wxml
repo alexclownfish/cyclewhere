@@ -5,7 +5,7 @@
     <view class="brand-wheel wheel-right"></view>
   </view>
 
-  <view class="brand-name">风迹骑行</view>
+  <view class="brand-name">骑哪儿</view>
   <view class="brand-copy">发现活动 · 共享路书 · 一起出发</view>
 
   <view class="login-actions">

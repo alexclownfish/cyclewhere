@@ -1,13 +1,14 @@
-# 风迹骑行微信小程序 MVP
+# 骑哪儿微信小程序 MVP
 
 原生微信小程序 + TypeScript 实现，覆盖活动发现、详情、报名、取消报名、路书、结构化发布和我的活动。默认使用本地演示数据，不依赖后端即可走通完整流程。
 
 ## 在微信开发者工具中运行
 
 1. 安装依赖：`npm install`
-2. 微信开发者工具选择“导入项目”，目录指向本目录。
-3. 首次演示可使用配置中的 `touristappid`；真机能力和发布前请替换成正式 AppID。
-4. 开发者工具需启用 TypeScript 编译插件（`project.config.json` 已配置）。
+2. 运行 `npm run build:wechat`，生成微信开发者工具需要的 JavaScript 页面文件。
+3. 微信开发者工具选择“导入项目”，目录指向本目录；修改 TypeScript 后再次运行该命令。
+4. 首次演示可使用配置中的 `touristappid`；真机能力和发布前请替换成正式 AppID。
+5. 开发者工具需启用 TypeScript 编译插件（`project.config.json` 已配置）。
 
 演示数据存储在小程序本地缓存中，报名、取消和发布会跨页面同步。需要恢复初始状态时，在开发者工具的 Storage 面板删除 `ride_demo_events_v1` 和 `ride_demo_registrations_v1`。
 
@@ -16,6 +17,8 @@
 编辑 `config/env.ts`，将 `API_BASE_URL` 设置为 API 地址。非空时客户端自动切换到真实 API：优先复用本地 `auth_token`；没有 token 时调用 `wx.login`，再通过 `POST /api/v1/auth/wechat/login` 换取 JWT。所有受保护请求只发送 `Authorization: Bearer <token>`，不发送或信任客户端用户 ID。
 
 本地 API 的 Demo mode 未配置微信凭据时，可使用与服务端相同的 `JWT_SECRET` 运行 `npm run token:demo -- user-demo`，然后在微信开发者工具 Storage 中将输出写入 `auth_token`。模拟器连接 `http://localhost:3000` 时需关闭“校验合法域名”；真机和发布环境必须配置 HTTPS 合法域名。
+
+生产登录要求后端 `WECHAT_APP_ID` 与 `project.config.json` 中的 AppID 完全一致，并在微信公众平台把 `https://cyclewhereapi.alexcld.com` 加入 request 合法域名。发布页会在进入时检查登录；JWT 过期会自动重新执行一次 `wx.login` 并重试原请求，仍失败时页面会展示微信或 API 返回的具体原因。
 
 主要契约：
 

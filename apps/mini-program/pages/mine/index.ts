@@ -120,25 +120,10 @@ Page({
     }
   },
   async wechatOneTapLogin() {
-    if (this.data.authChecking) return;
-    this.setData({ authChecking: true, authRequired: false, authError: '', authErrorCopy: '' });
-    try {
-      await api.login(true);
-      await this.checkLogin();
-    } catch (error) {
-      this.setData({ authChecking: false, authRequired: true, authError: errorMessage(error), authErrorCopy: friendlyAuthError(error) });
-    }
+    wx.navigateTo({ url: '/pages/privacy/index?intent=mine' });
   },
   async phoneLogin(event: WechatMiniprogram.CustomEvent<{ code?: string }>) {
-    const code = event.detail.code;
-    if (!code) return this.setData({ authError: 'PHONE_AUTH_CANCELLED', authErrorCopy: '未完成手机号授权，可使用微信一键登录。' });
-    this.setData({ authChecking: true, authRequired: false, authError: '', authErrorCopy: '' });
-    try {
-      await api.phoneLogin(code);
-      await this.checkLogin();
-    } catch (error) {
-      this.setData({ authChecking: false, authRequired: true, authError: errorMessage(error), authErrorCopy: friendlyAuthError(error) });
-    }
+    wx.navigateTo({ url: '/pages/privacy/index?intent=mine' });
   },
   async bindPhone(event: WechatMiniprogram.CustomEvent<{ code?: string }>) {
     const code = event.detail.code;

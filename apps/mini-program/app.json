@@ -1,6 +1,6 @@
 {
   "pages": [
-    "pages/login/index",
+    "pages/privacy/index",
     "pages/events/index",
     "pages/event-detail/index",
     "pages/register/index",
@@ -10,7 +10,7 @@
     "pages/mine/index"
   ],
   "window": {
-    "navigationBarTitleText": "风迹骑行",
+    "navigationBarTitleText": "骑哪儿",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f3f7f5",

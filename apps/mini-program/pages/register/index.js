@@ -43,7 +43,7 @@ Page({
         if (!wx.getStorageSync('auth_token')) {
             const result = await (0, apple_modal_1.openAppleModal)(this, { title: '请先登录', content: '授权微信头像和昵称后即完成注册，随后可继续报名。', confirmText: '去登录' });
             if (result.confirm)
-                wx.switchTab({ url: '/pages/mine/index' });
+                wx.navigateTo({ url: `/pages/privacy/index?intent=register&eventId=${encodeURIComponent(this.data.eventId)}` });
             return;
         }
         const validation = (0, domain_1.validateRegistration)(this.data.form);

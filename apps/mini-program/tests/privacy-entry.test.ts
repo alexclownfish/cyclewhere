@@ -1,0 +1,49 @@
+import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+import { api } from '../services/api';
+
+let privacyDefinition: any;
+(globalThis as any).Page = (value: any) => { privacyDefinition = value; };
+await import('../pages/privacy/index.ts');
+
+function makePage() {
+  return {
+    ...privacyDefinition,
+    data: structuredClone(privacyDefinition.data),
+    setData(update: Record<string, unknown>) { Object.assign(this.data, update); },
+  };
+}
+
+test('privacy entry is the startup page and exposes browse before login', () => {
+  const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
+  const markup = readFileSync(new URL('../pages/privacy/index.wxml', import.meta.url), 'utf8');
+  let target = '';
+  (globalThis as any).wx = { switchTab: ({ url }: { url: string }) => { target = url; } };
+  const page = makePage();
+  page.browse();
+  assert.equal(appConfig.pages[0], 'pages/privacy/index');
+  assert.equal(target, '/pages/events/index');
+  assert.match(markup, /仅浏览/);
+  assert.match(markup, /同意并继续/);
+});
+
+test('agree creates a WeChat session before requesting avatar and nickname', async () => {
+  const originalLogin = api.login;
+  const originalGetProfile = api.getProfile;
+  const calls: string[] = [];
+  (globalThis as any).wx = {
+    setStorageSync: (key: string) => calls.push(`storage:${key}`),
+  };
+  (api as any).login = async (forceRefresh: boolean) => { calls.push(`login:${forceRefresh}`); };
+  (api as any).getProfile = async () => { calls.push('profile'); return null; };
+  try {
+    const page = makePage();
+    await page.agree();
+    assert.deepEqual(calls, ['storage:privacy_policy_accepted_v1', 'login:true', 'profile']);
+    assert.equal(page.data.stage, 'profile');
+  } finally {
+    (api as any).login = originalLogin;
+    (api as any).getProfile = originalGetProfile;
+  }
+});

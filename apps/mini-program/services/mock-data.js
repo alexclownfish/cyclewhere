@@ -47,7 +47,7 @@ exports.events = [
         },
     },
     {
-        id: 'event-shisanling', title: '十三陵水库周末拉练', organizer: '风迹骑行', startAt: '2026-08-15T06:30:00+08:00', registrationDeadline: '2026-08-14T18:30:00+08:00',
+        id: 'event-shisanling', title: '十三陵水库周末拉练', organizer: '骑哪儿', startAt: '2026-08-15T06:30:00+08:00', registrationDeadline: '2026-08-14T18:30:00+08:00',
         meetingPoint: '北邵洼地铁站 B 口', routeId: 'route-shisanling', route: exports.routes[1], capacity: 16, registeredCount: 8,
         speedRange: '23-26 km/h', status: 'published', approvalRequired: false,
         description: '稳定巡航，设置领队与收队，适合有一定集团骑行经验的骑友。',
