@@ -10,10 +10,11 @@ interface LocationSuggestion { label: string; note: string; }
 
 const PENDING_EDIT_KEY = 'pending_edit_event_id';
 const RECENT_MEETING_POINTS_KEY = 'fengji_recent_meeting_points_v1';
+let keyboardCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
 Page({
   data: {
-    routes: [] as RideRoute[], routeOptions: [{ name: '不选择路书', route: null }] as RouteOption[], selectedRoute: null as RideRoute | null, routeIndex: 0, submitting: false, editingId: '', importingGpx: false,
+    routes: [] as RideRoute[], routeOptions: [{ name: '不选择路书', route: null }] as RouteOption[], selectedRoute: null as RideRoute | null, routeIndex: 0, submitting: false, editingId: '', importingGpx: false, keyboardOpen: false,
     locationSuggestions: [] as LocationSuggestion[], showLocationSuggestions: false,
     difficultyOptions: ['轻松', '中等', '进阶'] as RideRoute['difficulty'][], difficultyIndex: 1,
     coverPreview: '',
@@ -51,6 +52,10 @@ Page({
     this.setData({ editingId: pendingId, routesError: '' });
     if (!this.data.routes.length) await this.loadRoutes();
     await this.loadEditingEvent(pendingId);
+  },
+  onUnload() {
+    if (keyboardCloseTimer) clearTimeout(keyboardCloseTimer);
+    keyboardCloseTimer = null;
   },
   async loadEditingEvent(id: string) {
     try {
@@ -90,7 +95,20 @@ Page({
     this.setData({ [`form.${field}`]: value });
     if (field === 'meetingPoint') this.updateLocationSuggestions(value);
   },
+  onKeyboardOpen() {
+    if (keyboardCloseTimer) clearTimeout(keyboardCloseTimer);
+    keyboardCloseTimer = null;
+    if (!this.data.keyboardOpen) this.setData({ keyboardOpen: true });
+  },
+  onKeyboardClose() {
+    if (keyboardCloseTimer) clearTimeout(keyboardCloseTimer);
+    keyboardCloseTimer = setTimeout(() => {
+      this.setData({ keyboardOpen: false });
+      keyboardCloseTimer = null;
+    }, 120);
+  },
   showLocationSuggestions() {
+    this.onKeyboardOpen();
     this.updateLocationSuggestions(this.data.form.meetingPoint);
   },
   updateLocationSuggestions(value: string) {
@@ -126,14 +144,17 @@ Page({
       fail: () => undefined,
     });
   },
-  hideLocationSuggestions() { setTimeout(() => this.setData({ showLocationSuggestions: false }), 160); },
+  hideLocationSuggestions() {
+    this.onKeyboardClose();
+    setTimeout(() => this.setData({ showLocationSuggestions: false }), 160);
+  },
   noop() {},
   resolveAppleModal(event: WechatMiniprogram.TouchEvent) { completeAppleModal(this, String(event.currentTarget.dataset.confirm) === 'true'); },
   resetForNewEvent() {
     const now = new Date();
     const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     this.setData({
-      editingId: '', selectedRoute: null, routeIndex: 0, coverPreview: '', locationSuggestions: [], showLocationSuggestions: false,
+      editingId: '', selectedRoute: null, routeIndex: 0, coverPreview: '', locationSuggestions: [], showLocationSuggestions: false, keyboardOpen: false,
       form: {
         title: '', date, time: '06:30', meetingPoint: '', routeId: '', distanceKm: 0, elevationGainM: 0,
         difficulty: '中等', capacity: 16, speedRange: '23-26 km/h', description: '',

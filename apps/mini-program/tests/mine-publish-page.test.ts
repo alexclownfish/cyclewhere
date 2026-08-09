@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { api } from '../services/api';
 import { resolveAppleModal } from '../utils/apple-modal';
@@ -24,6 +25,13 @@ test('published event edit stores the id before switching to the publish tab', (
   assert.equal(switchedTo, '/pages/publish/index');
 });
 
+test('published card keeps the count and edit action in normal layout flow', () => {
+  const markup = readFileSync(new URL('../pages/mine/index.wxml', import.meta.url), 'utf8');
+  const styles = readFileSync(new URL('../pages/mine/index.wxss', import.meta.url), 'utf8');
+  assert.match(markup, /published-card-actions/);
+  assert.doesNotMatch(styles, /\.edit-button\s*\{[^}]*position:\s*absolute/);
+});
+
 let publishDefinition: any;
 (globalThis as any).Page = (value: any) => { publishDefinition = value; };
 await import('../pages/publish/index.ts');
@@ -46,6 +54,21 @@ test('meeting point input suggests recent and route points', () => {
   page.updateLocationSuggestions('北');
   assert.equal(page.data.showLocationSuggestions, true);
   assert.equal(page.data.locationSuggestions[0].label, '北邵洼地铁站');
+});
+
+test('keyboard focus hides the sticky publish action until input blur settles', async () => {
+  const markup = readFileSync(new URL('../pages/publish/index.wxml', import.meta.url), 'utf8');
+  const page = {
+    ...publishDefinition,
+    data: structuredClone(publishDefinition.data),
+    setData(update: Record<string, unknown>) { Object.assign(this.data, update); },
+  };
+  page.onKeyboardOpen();
+  assert.equal(page.data.keyboardOpen, true);
+  assert.match(markup, /wx:if="\{\{!keyboardOpen\}\}" class="sticky-actions"/);
+  page.onKeyboardClose();
+  await new Promise((resolve) => setTimeout(resolve, 140));
+  assert.equal(page.data.keyboardOpen, false);
 });
 
 test('resetForNewEvent clears edit mode and the previous event form', () => {

@@ -6,9 +6,10 @@ const presentation_1 = require("../../utils/presentation");
 const apple_modal_1 = require("../../utils/apple-modal");
 const PENDING_EDIT_KEY = 'pending_edit_event_id';
 const RECENT_MEETING_POINTS_KEY = 'fengji_recent_meeting_points_v1';
+let keyboardCloseTimer = null;
 Page({
     data: {
-        routes: [], routeOptions: [{ name: '不选择路书', route: null }], selectedRoute: null, routeIndex: 0, submitting: false, editingId: '', importingGpx: false,
+        routes: [], routeOptions: [{ name: '不选择路书', route: null }], selectedRoute: null, routeIndex: 0, submitting: false, editingId: '', importingGpx: false, keyboardOpen: false,
         locationSuggestions: [], showLocationSuggestions: false,
         difficultyOptions: ['轻松', '中等', '进阶'], difficultyIndex: 1,
         coverPreview: '',
@@ -51,6 +52,11 @@ Page({
         if (!this.data.routes.length)
             await this.loadRoutes();
         await this.loadEditingEvent(pendingId);
+    },
+    onUnload() {
+        if (keyboardCloseTimer)
+            clearTimeout(keyboardCloseTimer);
+        keyboardCloseTimer = null;
     },
     async loadEditingEvent(id) {
         try {
@@ -98,7 +104,23 @@ Page({
         if (field === 'meetingPoint')
             this.updateLocationSuggestions(value);
     },
+    onKeyboardOpen() {
+        if (keyboardCloseTimer)
+            clearTimeout(keyboardCloseTimer);
+        keyboardCloseTimer = null;
+        if (!this.data.keyboardOpen)
+            this.setData({ keyboardOpen: true });
+    },
+    onKeyboardClose() {
+        if (keyboardCloseTimer)
+            clearTimeout(keyboardCloseTimer);
+        keyboardCloseTimer = setTimeout(() => {
+            this.setData({ keyboardOpen: false });
+            keyboardCloseTimer = null;
+        }, 120);
+    },
     showLocationSuggestions() {
+        this.onKeyboardOpen();
         this.updateLocationSuggestions(this.data.form.meetingPoint);
     },
     updateLocationSuggestions(value) {
@@ -137,14 +159,17 @@ Page({
             fail: () => undefined,
         });
     },
-    hideLocationSuggestions() { setTimeout(() => this.setData({ showLocationSuggestions: false }), 160); },
+    hideLocationSuggestions() {
+        this.onKeyboardClose();
+        setTimeout(() => this.setData({ showLocationSuggestions: false }), 160);
+    },
     noop() { },
     resolveAppleModal(event) { (0, apple_modal_1.resolveAppleModal)(this, String(event.currentTarget.dataset.confirm) === 'true'); },
     resetForNewEvent() {
         const now = new Date();
         const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         this.setData({
-            editingId: '', selectedRoute: null, routeIndex: 0, coverPreview: '', locationSuggestions: [], showLocationSuggestions: false,
+            editingId: '', selectedRoute: null, routeIndex: 0, coverPreview: '', locationSuggestions: [], showLocationSuggestions: false, keyboardOpen: false,
             form: {
                 title: '', date, time: '06:30', meetingPoint: '', routeId: '', distanceKm: 0, elevationGainM: 0,
                 difficulty: '中等', capacity: 16, speedRange: '23-26 km/h', description: '',
