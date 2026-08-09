@@ -8,5 +8,6 @@
     "noEmitOnError": true,
     "declaration": false,
     "sourceMap": false
-  }
+  },
+  "exclude": ["node_modules", "tests"]
 }

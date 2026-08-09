@@ -39,6 +39,7 @@ test('publish validation enforces structured safety requirements', () => {
   assert.equal(validatePublish({ ...input, requirements: { ...input.requirements, equipment: [] } }).valid, false);
   assert.equal(validatePublish({ ...input, requirements: { ...input.requirements, bikeTypes: [] } }).valid, false);
   assert.equal(validatePublish({ ...input, requirements: { ...input.requirements, disciplines: [] } }).valid, false);
+  assert.equal(validatePublish({ ...input, requirements: { ...input.requirements, customNote: '补'.repeat(201) } }).message, '补充说明最多 200 个字');
 });
 
 test('publish validation requires manual distance only when no roadbook is selected', () => {

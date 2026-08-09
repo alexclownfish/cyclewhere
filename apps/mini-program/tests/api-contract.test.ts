@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { ApiError, createAuthenticationProvider, createRealApi, normalizeRequestSpec, type RequestSpec, type Transport } from '../services/api.ts';
-import type { BackendEvent, BackendRegistrationResult, BackendRoadbook } from '../services/api-contract.ts';
+import { mapEvent, toCreateEvent, type BackendEvent, type BackendRegistrationResult, type BackendRoadbook } from '../services/api-contract.ts';
 import type { PublishEventInput, RegistrationInput } from '../types/domain.ts';
 
 const roadbook: BackendRoadbook = {
@@ -50,6 +50,30 @@ test('list adapter consumes backend pages and maps event/roadbook field names', 
   assert.equal(event.route.maxGradient, 11.8);
   assert.notEqual(event.route.track[0].longitude, roadbook.track[0].longitude);
   assert.equal(event.ownedByMe, true);
+});
+
+test('editing an event removes duplicated generated ability text before resubmission', () => {
+  const corrupted = {
+    ...backendEvent,
+    abilityRequirements: [
+      '近 30 天完成过 30 公里骑行', '近 30 天累计爬升 30 米', '允许车型：公路车',
+      '听从领队指挥', '保持安全车距',
+      '近 30 天完成过 30 公里骑行；近 30 天累计爬升 30 米；允许车型：公路车；听从领队指挥；保持安全车距',
+    ],
+  };
+  const event = mapEvent(corrupted, undefined, 'organizer-demo');
+  assert.equal(event.requirements.customNote, '');
+  assert.deepEqual(event.requirements.bikeTypes, ['公路车']);
+  assert.deepEqual(event.requirements.disciplines, ['听从领队指挥', '保持安全车距']);
+
+  const payload = toCreateEvent({
+    title: event.title, date: '2026-09-13', time: '07:00', meetingPoint: event.meetingPoint,
+    routeId: '', distanceKm: event.route.distanceKm, elevationGainM: event.route.elevationGainM,
+    difficulty: event.route.difficulty, capacity: event.capacity, speedRange: event.speedRange,
+    description: event.description, requirements: event.requirements,
+  });
+  assert.equal(payload.abilityRequirements.length, 5);
+  assert.ok(payload.abilityRequirements.every((item) => item.length <= 200));
 });
 
 test('registration sends the encrypted-field payload contract and keeps one supplied idempotency key', async () => {

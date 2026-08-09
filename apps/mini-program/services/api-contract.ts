@@ -52,8 +52,29 @@ const difficultyToBackend: Record<RideRoute['difficulty'], BackendDifficulty> = 
 };
 
 function abilityNumber(items: string[], keyword: string): number {
-  const text = items.find((item) => item.includes(keyword));
+  const text = items.flatMap((item) => item.split(/[；;]/)).find((item) => item.includes(keyword));
   return Number(text?.match(/\d+(?:\.\d+)?/)?.[0] || 0);
+}
+
+const disciplineLabels = ['听从领队指挥', '保持安全车距', '下坡禁止超车', '掉队原地等收队'];
+
+function parseAbilityRequirements(items: string[]) {
+  const segments = items.flatMap((item) => item.split(/[；;]/)).map((item) => item.trim()).filter(Boolean);
+  const bikeLine = segments.find((item) => /^允许车型[:：]/.test(item));
+  const bikeTypes = bikeLine
+    ? bikeLine.replace(/^允许车型[:：]\s*/, '').split(/[、,，/]/).map((item) => item.trim()).filter(Boolean)
+    : [];
+  const disciplines = disciplineLabels.filter((label) => segments.includes(label));
+  const generated = (item: string) => /^近\s*\d+\s*天完成过\s*\d+(?:\.\d+)?\s*公里骑行$/.test(item)
+    || /^近\s*\d+\s*天累计爬升\s*\d+(?:\.\d+)?\s*米$/.test(item)
+    || /^允许车型[:：]/.test(item)
+    || disciplineLabels.includes(item);
+  const customNote = [...new Set(segments.filter((item) => !generated(item)))].join('；').slice(0, 200);
+  return {
+    bikeTypes: bikeTypes.length ? [...new Set(bikeTypes)] : ['公路车'],
+    disciplines: disciplines.length ? disciplines : disciplineLabels.slice(0, 2),
+    customNote,
+  };
 }
 
 export function mapRoadbook(roadbook: BackendRoadbook): RideRoute {
@@ -81,6 +102,7 @@ export function fallbackRoute(event: BackendEvent): RideRoute {
 }
 
 export function mapEvent(event: BackendEvent, route: RideRoute | undefined, currentUserId: string): RideEvent {
+  const parsedRequirements = parseAbilityRequirements(event.abilityRequirements);
   return {
     id: event.id, title: event.title, coverUrl: event.coverUrl || null,
     organizer: event.organizerProfile?.nickname || '活动组织者', organizerAvatarUrl: event.organizerProfile?.avatarUrl || null,
@@ -91,8 +113,8 @@ export function mapEvent(event: BackendEvent, route: RideRoute | undefined, curr
     description: event.summary,
     requirements: {
       equipment: event.equipmentRequirements, recentDistanceKm: abilityNumber(event.abilityRequirements, '公里'),
-      recentElevationM: abilityNumber(event.abilityRequirements, '爬升'), bikeTypes: ['公路车'],
-      disciplines: [event.safetyNotice], customNote: event.abilityRequirements.join('；'),
+      recentElevationM: abilityNumber(event.abilityRequirements, '爬升'), bikeTypes: parsedRequirements.bikeTypes,
+      disciplines: parsedRequirements.disciplines, customNote: parsedRequirements.customNote,
     },
     ownedByMe: event.ownedByMe ?? (Boolean(currentUserId) && event.organizerId === currentUserId),
   };
@@ -106,13 +128,14 @@ export function toCreateEvent(input: PublishEventInput, route?: RideRoute): Crea
   const startAt = new Date(`${input.date}T${input.time}:00+08:00`);
   const registrationDeadline = new Date(startAt.getTime() - 12 * 60 * 60 * 1000);
   const speeds = input.speedRange.match(/\d+(?:\.\d+)?/g)?.map(Number) || [];
-  const abilityRequirements = [
+  const abilityRequirements = [...new Set([
     `近 30 天完成过 ${input.requirements.recentDistanceKm} 公里骑行`,
     `近 30 天累计爬升 ${input.requirements.recentElevationM} 米`,
     `允许车型：${input.requirements.bikeTypes.join('、')}`,
     ...input.requirements.disciplines,
-  ];
-  if (input.requirements.customNote) abilityRequirements.push(input.requirements.customNote);
+  ])];
+  const customNote = input.requirements.customNote?.trim().slice(0, 200);
+  if (customNote && !abilityRequirements.includes(customNote)) abilityRequirements.push(customNote);
   return {
     routeId: input.routeId || null, title: input.title.trim(), summary: input.description.trim(),
     startAt: startAt.toISOString(), registrationDeadline: registrationDeadline.toISOString(), meetingPoint: input.meetingPoint.trim(),

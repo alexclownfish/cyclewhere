@@ -39,6 +39,7 @@ export function validatePublish(input: PublishEventInput): ValidationResult {
   if (input.requirements.equipment.length === 0) return { valid: false, message: '请至少选择一项必备装备' };
   if (input.requirements.bikeTypes.length === 0) return { valid: false, message: '请至少选择一种允许车型' };
   if (input.requirements.disciplines.length === 0) return { valid: false, message: '请至少选择一项骑行纪律' };
+  if ((input.requirements.customNote?.trim().length ?? 0) > 200) return { valid: false, message: '补充说明最多 200 个字' };
   if (input.requirements.recentDistanceKm < 0 || input.requirements.recentDistanceKm > 1000) return { valid: false, message: '近期距离应为 0 至 1000 km' };
   if (input.requirements.recentElevationM < 0 || input.requirements.recentElevationM > 30000) return { valid: false, message: '近期爬升应为 0 至 30000 m' };
   return { valid: true, message: '' };
