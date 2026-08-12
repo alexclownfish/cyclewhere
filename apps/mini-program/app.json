@@ -1,11 +1,10 @@
 {
   "pages": [
     "pages/privacy/index",
+    "pages/gateway/index",
     "pages/events/index",
     "pages/event-detail/index",
     "pages/register/index",
-    "pages/routes/index",
-    "pages/route-detail/index",
     "pages/publish/index",
     "pages/mine/index"
   ],
@@ -23,7 +22,6 @@
     "borderStyle": "black",
     "list": [
       { "pagePath": "pages/events/index", "text": "活动" },
-      { "pagePath": "pages/routes/index", "text": "路书" },
       { "pagePath": "pages/publish/index", "text": "发布" },
       { "pagePath": "pages/mine/index", "text": "我的" }
     ]

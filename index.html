@@ -402,6 +402,7 @@
       background: var(--glass);
       backdrop-filter: blur(28px) saturate(180%);
       -webkit-backdrop-filter: blur(28px) saturate(180%);
+      grid-template-columns: repeat(3, 1fr);
     }
     .topbar-title { font-size: 29px; line-height: 1.06; font-weight: 750; }
     .topbar-title svg { width: 18px; height: 18px; color: var(--muted); }
@@ -651,6 +652,38 @@
     .privacy-profile-card { border-radius: 28px; margin: auto 14px 22px; padding: 18px 22px 24px; box-shadow: 0 18px 42px rgba(8,77,54,.12); }
     .privacy-handle { width: 36px; height: 5px; margin: 0 auto 18px; border-radius: 5px; background: rgba(60,60,67,.2); }.privacy-card h2, .privacy-profile-card h2 { margin: 0; color: var(--ink); font-size: 21px; text-align: center; }.privacy-subtitle { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; text-align: center; }.privacy-description { margin: 23px 0 0; color: #4a4a4d; font-size: 13px; line-height: 1.7; }.privacy-policy-link { margin: 8px 0 0; padding: 0; border: 0; background: transparent; color: var(--accent); font-size: 13px; font-weight: 600; }.privacy-actions { display: flex; gap: 10px; margin-top: 26px; }.privacy-actions .text-btn { flex: 1; }.privacy-kicker { color: var(--accent); font-size: 12px; font-weight: 700; text-align: center; }.privacy-profile-card h2 { margin-top: 8px; }.h5-avatar { position: relative; display: grid; width: 76px; height: 76px; margin: 22px auto 18px; border: 5px solid #fff; border-radius: 50%; background: #3c765e; color: #fff; font-size: 25px; font-weight: 700; place-items: center; box-shadow: 0 0 0 2px rgba(8,127,91,.15); }.h5-avatar span { position: absolute; right: -2px; bottom: -2px; display: grid; width: 25px; height: 25px; border: 3px solid #fff; border-radius: 50%; background: var(--accent); color: #fff; font-size: 17px; font-weight: 400; place-items: center; }.privacy-field-label { display: block; margin: 0 0 8px; color: #3a3a3c; font-size: 12px; font-weight: 700; }.privacy-profile-card input { width: 100%; height: 45px; padding: 0 13px; border: 0; border-radius: 12px; outline: 0; background: rgba(118,118,128,.1); color: var(--ink); }.privacy-profile-card .text-btn { margin-top: 20px; }.privacy-back { display: block; width: 100%; margin: 10px 0 0; padding: 8px; border: 0; background: transparent; color: var(--muted); }
 
+    .ride-gateway { position: relative; min-height: 100%; padding: 58px 22px 28px; overflow: hidden; background: #f3f8f5; }
+    .gateway-glow { position: absolute; inset: 0; opacity: .42; background: radial-gradient(circle at 50% 28%, rgba(8,127,91,.18), transparent 33%); pointer-events: none; }
+    .gateway-brand { position: relative; z-index: 2; color: var(--accent); font-size: 12px; font-weight: 750; text-align: center; }
+    .gateway-title { position: relative; z-index: 2; margin: 12px 0 8px; color: #17352a; font-size: 29px; line-height: 1.25; text-align: center; }
+    .gateway-copy { position: relative; z-index: 2; margin: 0; color: #68766f; font-size: 13px; line-height: 1.6; text-align: center; }
+    .bike-stage { position: relative; z-index: 2; height: 260px; margin: 24px -22px 0; overflow: hidden; }
+    .bike-sun { position: absolute; top: 18px; right: 42px; width: 42px; height: 42px; border-radius: 50%; background: #d7f28a; box-shadow: 0 0 0 12px rgba(215,242,138,.22); }
+    .bike-hill { position: absolute; left: -12%; bottom: 48px; width: 70%; height: 104px; border-radius: 50% 50% 0 0; background: #dcece3; transform: rotate(7deg); }
+    .bike-hill-right { left: 48%; bottom: 44px; width: 78%; height: 132px; background: #cfe4d8; transform: rotate(-9deg); }
+    .bike-road { position: absolute; right: 0; bottom: 42px; left: 0; height: 5px; border-radius: 4px; background: #174a38; }
+    .bike-road::after { position: absolute; top: 16px; right: -18%; left: -18%; height: 1px; background: rgba(23,74,56,.16); content: ""; }
+    .bike-rider { position: absolute; bottom: 48px; left: 50%; width: 112px; height: 78px; color: #087f5b; transform: translateX(-50%); animation: gateway-ride 2.4s ease-in-out infinite; }
+    .bike-rider svg { width: 112px; height: 78px; stroke-width: 1.6; filter: drop-shadow(0 10px 10px rgba(8,77,54,.14)); }
+    .speed-line { position: absolute; right: 61%; height: 2px; border-radius: 2px; background: rgba(8,127,91,.22); animation: speed-line 1.25s ease-in-out infinite; }
+    .speed-one { bottom: 100px; width: 54px; }.speed-two { bottom: 81px; width: 34px; animation-delay: .22s; }.speed-three { bottom: 120px; width: 26px; animation-delay: .42s; }
+    .gateway-loading { position: relative; z-index: 2; margin-top: -4px; color: #68766f; font-size: 12px; text-align: center; transition: opacity .22s ease; }
+    .gateway-progress { width: 132px; height: 4px; margin: 12px auto 0; overflow: hidden; border-radius: 4px; background: rgba(8,127,91,.12); }
+    .gateway-progress span { display: block; width: 45%; height: 100%; border-radius: inherit; background: var(--accent); animation: loading-track 1.2s ease-in-out infinite; }
+    .gateway-actions { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 20px; opacity: 0; transform: translateY(14px); pointer-events: none; transition: opacity .35s ease, transform .35s ease; }
+    .ride-gateway.ready .gateway-actions { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .ride-gateway.ready .gateway-loading { opacity: 0; }
+    .app.gateway-mode .bottom-nav { display: none; }
+    .gateway-action { position: relative; display: flex; min-width: 0; min-height: 112px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; margin: 0; padding: 14px; border: 1px solid rgba(8,127,91,.11); border-radius: 18px; background: rgba(255,255,255,.92); color: #17352a; text-align: left; box-shadow: 0 12px 30px rgba(8,77,54,.07); }
+    .gateway-action.primary { border-color: transparent; background: #087f5b; color: #fff; box-shadow: 0 14px 32px rgba(8,127,91,.2); }
+    .gateway-action-icon { display: grid; width: 42px; height: 42px; border-radius: 14px; background: rgba(8,127,91,.1); color: #087f5b; place-items: center; }
+    .gateway-action.primary .gateway-action-icon { background: rgba(255,255,255,.16); color: #fff; }
+    .gateway-action strong, .gateway-action small { display: block; }.gateway-action strong { font-size: 15px; }.gateway-action small { margin-top: 4px; color: #718078; font-size: 10px; font-weight: 450; line-height: 1.45; }.gateway-action.primary small { color: rgba(255,255,255,.72); }
+    .gateway-action > svg { position: absolute; top: 18px; right: 12px; width: 18px; }
+    @keyframes gateway-ride { 0%,100% { transform: translateX(-50%) translateY(0) rotate(-1deg); } 50% { transform: translateX(-50%) translateY(-7px) rotate(1deg); } }
+    @keyframes speed-line { 0% { opacity: 0; transform: translateX(30px) scaleX(.5); } 45% { opacity: 1; } 100% { opacity: 0; transform: translateX(-30px) scaleX(1.2); } }
+    @keyframes loading-track { 0% { transform: translateX(-110%); } 100% { transform: translateX(230%); } }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
     }
@@ -686,9 +719,10 @@
       <p>发现活动，跟随路书，和合拍的骑友一起出发。</p>
         <nav class="prototype-nav">
           <button class="active" data-screen-link="privacy"><i data-lucide="shield-check"></i><span>00 · 隐私声明与登录</span></button>
-          <button data-screen-link="home"><i data-lucide="calendar-days"></i><span>01 · 活动发现</span></button>
-          <button data-screen-link="detail"><i data-lucide="file-text"></i><span>02 · 活动详情与报名</span></button>
-          <button data-screen-link="route"><i data-lucide="map"></i><span>03 · 路书详情</span></button>
+          <button data-screen-link="gateway"><i data-lucide="bike"></i><span>01 · 骑行动态入口</span></button>
+          <button data-screen-link="home"><i data-lucide="calendar-days"></i><span>02 · 活动发现</span></button>
+          <button data-screen-link="detail"><i data-lucide="file-text"></i><span>03 · 活动详情与报名</span></button>
+          <!-- 路书入口暂时停用，保留代码便于后续恢复。 -->
           <button data-screen-link="publish"><i data-lucide="circle-plus"></i><span>04 · 发布活动</span></button>
           <button data-screen-link="profile"><i data-lucide="user-round"></i><span>05 · 我的活动</span></button>
       </nav>
@@ -703,6 +737,23 @@
             <div class="privacy-hero"><div class="privacy-mark"><span class="privacy-road"></span><span class="privacy-wheel privacy-wheel-left"></span><span class="privacy-wheel privacy-wheel-right"></span></div><h1>骑哪儿</h1><p>发现活动，共享路书，和骑友一起出发</p></div>
             <div class="privacy-card" id="privacyConsent"><div class="privacy-handle"></div><h2>欢迎光临</h2><p class="privacy-subtitle">请先阅读隐私政策声明</p><p class="privacy-description">为了提供活动报名、发布和骑友联系服务，只有在你同意后，我们才会请求微信头像和昵称，用于创建骑行身份。</p><button class="privacy-policy-link">《骑哪儿隐私政策》</button><div class="privacy-actions"><button class="text-btn secondary" data-go="home">仅浏览</button><button class="text-btn primary" id="agreePrivacy">同意并继续</button></div></div>
             <div class="privacy-profile-card" id="privacyProfile" hidden><div class="privacy-handle"></div><div class="privacy-kicker">已同意隐私政策</div><h2>设置微信骑行身份</h2><p class="privacy-subtitle">头像和昵称仅展示给活动骑友与组织者。</p><button class="h5-avatar" aria-label="选择微信头像">林<span>+</span></button><label class="privacy-field-label" for="privacyNickname">微信昵称</label><input id="privacyNickname" value="林川" placeholder="请选择或填写昵称"><button class="text-btn primary" id="completePrivacy">完成并进入骑哪儿</button><button class="privacy-back" id="backPrivacy">返回</button></div>
+          </section>
+
+          <section class="screen ride-gateway" id="screen-gateway">
+            <div class="gateway-glow"></div>
+            <div class="gateway-brand">骑哪儿 · READY TO RIDE</div>
+            <h1 class="gateway-title">今天，骑去哪儿？</h1>
+            <p class="gateway-copy">正在为你准备附近的骑行活动</p>
+            <div class="bike-stage" aria-label="自行车骑行加载动画">
+              <div class="bike-sun"></div><div class="bike-hill"></div><div class="bike-hill bike-hill-right"></div>
+              <span class="speed-line speed-one"></span><span class="speed-line speed-two"></span><span class="speed-line speed-three"></span>
+              <div class="bike-rider"><i data-lucide="bike"></i></div><div class="bike-road"></div>
+            </div>
+            <div class="gateway-loading">正在连接骑行世界<div class="gateway-progress"><span></span></div></div>
+            <div class="gateway-actions">
+              <button class="gateway-action primary" data-go="home"><span class="gateway-action-icon"><i data-lucide="users-round"></i></span><span><strong>参加活动</strong><small>发现附近正在招募的骑行</small></span><i data-lucide="chevron-right"></i></button>
+              <button class="gateway-action" data-go="publish"><span class="gateway-action-icon"><i data-lucide="circle-plus"></i></span><span><strong>发布活动</strong><small>创建路线，邀请骑友一起出发</small></span><i data-lucide="chevron-right"></i></button>
+            </div>
           </section>
 
           <section class="screen" id="screen-home">
@@ -733,11 +784,13 @@
                 </div>
               </article>
 
+              <!-- 精选路书模块暂时停用。
               <div class="section-head" style="margin-top:22px"><h2>精选路书</h2><button data-go="route">更多</button></div>
               <div class="route-strip">
                 <button class="route-card" data-go="route"><img src="assets/route-mountain-v2.jpg" alt="沿海公路骑行者"><div class="route-copy"><strong>十三陵水库环线</strong><span>67 km · 爬升 680 m · 中等</span></div></button>
                 <button class="route-card" data-go="route"><img src="assets/ride-hero.jpg" alt="城市道路骑行者"><div class="route-copy"><strong>通州运河轻松线</strong><span>42 km · 爬升 120 m · 轻松</span></div></button>
               </div>
+              -->
 
               <div class="section-head" style="margin-top:22px"><h2>更多选择</h2></div>
               <article class="list-event"><div class="list-event-top"><span class="badge green">新手友好</span><span class="members">11 / 20 人</span></div><h3>温榆河绿道咖啡骑</h3><div class="meta-line"><i data-lucide="clock"></i>8月9日 07:00 · 38 km · 均速 20–23</div></article>
@@ -757,12 +810,13 @@
               </div>
               <div class="organizer"><div class="avatar">北</div><div><strong>北风骑行社</strong><br><small>认证组织者 · 已发起 48 场</small></div></div>
             </div>
-            <section class="detail-section"><h2>路线概览</h2><div class="route-preview" data-go="route"><div class="map-grid"></div><canvas class="route-canvas" aria-label="妙峰山骑行路线缩略图"></canvas><span class="route-preview-label">查看完整路书</span></div></section>
+            <!-- 活动详情内的路书入口暂时停用。 -->
             <section class="detail-section"><h2>参加要求</h2><div class="requirement-list"><div class="requirement"><i data-lucide="circle-check"></i><span>近 30 天内完成过 70 km 以上公路骑行</span></div><div class="requirement"><i data-lucide="circle-check"></i><span>必须佩戴头盔，自备补胎工具、前后车灯</span></div><div class="requirement"><i data-lucide="triangle-alert" style="color:var(--amber)"></i><span>连续爬坡约 11 km，返程含连续弯道，请谨慎评估能力</span></div></div></section>
             <section class="detail-section"><h2>活动说明</h2><p style="font-size:13px;line-height:1.75;margin:0;color:var(--muted)">全程不拉爆，山脚按能力分组。妙峰山顶统一合影，返程在担礼村补给。遇中雨或道路管制将提前取消并通知。</p></section>
             <div class="sticky-action"><button class="icon-btn" aria-label="联系组织者"><i data-lucide="message-circle"></i></button><button class="text-btn primary" id="registerButton">报名参加 · 剩余 7 位</button></div>
           </section>
 
+          <!-- 独立路书详情页暂时停用。
           <section class="screen" id="screen-route">
             <div class="route-map"><div class="map-grid"></div><canvas id="routeCanvas" aria-label="十三陵水库环线路线图"></canvas><div class="map-top"><button class="icon-btn" aria-label="返回" data-go="home"><i data-lucide="arrow-left"></i></button><button class="icon-btn" aria-label="定位路线"><i data-lucide="locate-fixed"></i></button></div></div>
             <div class="route-summary"><span class="badge green">官方精选 · 中等</span><h1>十三陵水库环线</h1><div class="meta-line"><i data-lucide="map-pin"></i>北京市昌平区 · 环线</div><div class="metric-row"><div class="metric"><strong>67 km</strong><span>距离</span></div><div class="metric"><strong>680 m</strong><span>爬升</span></div><div class="metric"><strong>3h 10m</strong><span>预计</span></div><div class="metric"><strong>8.6%</strong><span>最大坡度</span></div></div></div>
@@ -770,6 +824,7 @@
             <section class="detail-section"><h2>沿途关键点</h2><div class="poi-list"><div class="poi"><span class="poi-icon"><i data-lucide="coffee"></i></span><div><strong>十三陵水库便利店</strong><br><small>24.6 km · 补水和简餐</small></div><small>补给</small></div><div class="poi"><span class="poi-icon warn"><i data-lucide="triangle-alert"></i></span><div><strong>蟒山连续弯道</strong><br><small>41.8 km · 下坡控制速度</small></div><small>风险</small></div><div class="poi"><span class="poi-icon"><i data-lucide="wrench"></i></span><div><strong>捷安特昌平店</strong><br><small>61.2 km · 维修点</small></div><small>维修</small></div></div></section>
             <div class="sticky-action"><button class="icon-btn" aria-label="收藏路书"><i data-lucide="bookmark"></i></button><button class="text-btn secondary" id="offlineButton">下载离线</button><button class="text-btn dark" id="trackButton">轨迹跟随</button></div>
           </section>
+          -->
 
           <section class="screen" id="screen-publish">
             <header class="topbar"><div class="topbar-title">发布活动</div><button class="icon-btn" aria-label="关闭" data-go="home"><i data-lucide="x"></i></button></header>
@@ -827,7 +882,7 @@
 
         <nav class="bottom-nav" aria-label="主导航">
           <button class="nav-item active" data-go="home"><i data-lucide="calendar-days"></i><span>活动</span></button>
-          <button class="nav-item" data-go="route"><i data-lucide="map"></i><span>路书</span></button>
+          <!-- 路书 Tab 暂时停用。 -->
           <button class="nav-item" data-go="publish"><i data-lucide="circle-plus"></i><span>发布</span></button>
           <button class="nav-item" data-go="profile"><i data-lucide="user-round"></i><span>我的</span></button>
         </nav>
@@ -849,9 +904,16 @@
 
     function showScreen(name) {
       screens.forEach(screen => screen.classList.toggle('active', screen.id === `screen-${name}`));
+      document.querySelector('.app').classList.toggle('gateway-mode', name === 'gateway');
       navItems.forEach(item => item.classList.toggle('active', item.dataset.go === name));
       prototypeLinks.forEach(item => item.classList.toggle('active', item.dataset.screenLink === name));
       mainScroll.scrollTop = 0;
+      if (name === 'gateway') {
+        const gateway = document.getElementById('screen-gateway');
+        gateway.classList.remove('ready');
+        window.clearTimeout(showScreen.gatewayTimer);
+        showScreen.gatewayTimer = window.setTimeout(() => gateway.classList.add('ready'), 1650);
+      }
       if (name === 'route' || name === 'detail') requestAnimationFrame(drawAllCharts);
       if (window.lucide) lucide.createIcons();
     }
@@ -886,8 +948,7 @@
       document.getElementById('profileRide').querySelector('.badge').textContent = '等待审核';
     });
     document.getElementById('finishRegistration').addEventListener('click', () => { sheet.classList.remove('open'); showScreen('profile'); });
-    document.getElementById('offlineButton').addEventListener('click', () => showToast('离线路书已加入下载队列'));
-    document.getElementById('trackButton').addEventListener('click', () => showToast('轨迹跟随已开启 · 请注意骑行安全'));
+    // 路书页停用期间不注册离线下载和轨迹跟随事件。
     document.getElementById('nextPublish').addEventListener('click', () => showToast('草稿已保存 · 进入第 2 步'));
     document.getElementById('agreePrivacy').addEventListener('click', () => {
       document.getElementById('privacyConsent').hidden = true;
@@ -897,7 +958,7 @@
       document.getElementById('privacyProfile').hidden = true;
       document.getElementById('privacyConsent').hidden = false;
     });
-    document.getElementById('completePrivacy').addEventListener('click', () => showScreen('home'));
+    document.getElementById('completePrivacy').addEventListener('click', () => showScreen('gateway'));
     document.querySelectorAll('.requirement-option').forEach(option => option.addEventListener('change', () => {
       const selected = document.querySelectorAll('.requirement-option:checked').length;
       document.getElementById('requirementSummary').textContent = `已设置 ${selected} 项必备要求，并启用距离、爬升与车型门槛。`;
@@ -934,6 +995,7 @@
 
     function drawElevation() {
       const canvas = document.getElementById('elevationCanvas');
+      if (!canvas) return;
       const { ctx, width, height } = setupCanvas(canvas);
       const vals = [.22,.25,.24,.29,.34,.49,.61,.72,.58,.47,.52,.69,.82,.68,.51,.42,.35,.31,.38,.27,.22];
       const pad = 8;
@@ -945,7 +1007,13 @@
       ctx.strokeStyle='#087f5b';ctx.lineWidth=3;ctx.stroke();
     }
 
-    function drawAllCharts() { document.querySelectorAll('.route-canvas').forEach(drawRoute); drawRoute(document.getElementById('routeCanvas')); drawElevation(); }
+    function drawAllCharts() {
+      document.querySelectorAll('.route-canvas').forEach(drawRoute);
+      const routeCanvas = document.getElementById('routeCanvas');
+      const elevationCanvas = document.getElementById('elevationCanvas');
+      if (routeCanvas) drawRoute(routeCanvas);
+      if (elevationCanvas) drawElevation();
+    }
     window.addEventListener('resize', drawAllCharts);
     if (window.lucide) lucide.createIcons();
     requestAnimationFrame(drawAllCharts);

@@ -1,0 +1,32 @@
+<view class="gateway-page {{ready ? 'gateway-ready' : ''}}">
+  <view class="gateway-glow"></view>
+  <view class="safe-top"></view>
+  <view class="gateway-brand">骑哪儿 · READY TO RIDE</view>
+  <view class="gateway-title">今天，骑去哪儿？</view>
+  <view class="gateway-copy">正在为你准备附近的骑行活动</view>
+
+  <view class="bike-stage">
+    <view class="bike-sun"></view>
+    <view class="bike-hill"></view><view class="bike-hill bike-hill-right"></view>
+    <view class="speed-line speed-one"></view><view class="speed-line speed-two"></view><view class="speed-line speed-three"></view>
+    <view class="bike-rider">
+      <view class="bike-wheel bike-wheel-left"></view><view class="bike-wheel bike-wheel-right"></view>
+      <view class="bike-frame bike-frame-main"></view><view class="bike-frame bike-frame-top"></view>
+      <view class="bike-fork"></view><view class="bike-seat"></view>
+      <view class="rider-body"></view><view class="rider-head"></view><view class="rider-arm"></view><view class="rider-leg"></view>
+    </view>
+    <view class="bike-road"></view>
+  </view>
+
+  <view class="gateway-loading">正在连接骑行世界<view class="gateway-progress"><view></view></view></view>
+  <view class="gateway-actions">
+    <button class="gateway-action gateway-primary" disabled="{{!ready}}" bindtap="joinActivity">
+      <view class="action-head"><view class="action-icon people-icon"><view></view><view></view></view><view class="action-arrow">›</view></view>
+      <view class="action-title">参加活动</view><view class="action-copy">发现附近正在招募的骑行</view>
+    </button>
+    <button class="gateway-action" disabled="{{!ready}}" bindtap="publishActivity">
+      <view class="action-head"><view class="action-icon plus-icon">+</view><view class="action-arrow">›</view></view>
+      <view class="action-title">发布活动</view><view class="action-copy">创建路线，邀请骑友一起出发</view>
+    </button>
+  </view>
+</view>

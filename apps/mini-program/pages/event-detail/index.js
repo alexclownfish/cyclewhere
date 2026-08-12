@@ -93,11 +93,6 @@ Page({
             this.setData({ participants: this.data.participants.map((item) => item.key === participant.key ? { ...item, contactLoading: false } : item) });
         }
     },
-    openRoute() {
-        if (!this.data.event?.routeId)
-            return wx.showToast({ title: '该活动暂未关联公开路书', icon: 'none' });
-        wx.navigateTo({ url: `/pages/route-detail/index?id=${this.data.event.routeId}` });
-    },
     handlePrimary() {
         if (this.data.registration)
             return wx.switchTab({ url: '/pages/mine/index' });

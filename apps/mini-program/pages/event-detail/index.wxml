@@ -38,11 +38,6 @@
         </view>
       </view>
     </view>
-    <view class="detail-section route-entry" bindtap="openRoute">
-      <view class="row-between"><view><view class="form-title route-name">{{event.route.name}}</view><view class="small">{{event.route.distanceKm}} km · 爬升 {{event.route.elevationGainM}} m · {{event.route.difficulty}}</view></view><text class="chevron">›</text></view>
-      <view class="route-track"><view class="route-line"></view><view class="route-dot route-start"></view><view class="route-dot route-end"></view></view>
-      <view class="small route-hint">路线仅供参考，出发前请下载离线轨迹并留意现场路况。</view>
-    </view>
     <view class="detail-section">
       <view class="section-kicker">READINESS</view><view class="form-title">装备与能力要求</view>
       <view class="require-group"><view class="require-label">必备装备</view><view class="tag-wrap"><text wx:for="{{event.requirements.equipment}}" wx:key="*this" class="tag">{{item}}</text></view></view>

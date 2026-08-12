@@ -30,7 +30,7 @@ Page({
     }
   },
   browse() {
-    wx.switchTab({ url: '/pages/events/index' });
+    wx.redirectTo({ url: '/pages/gateway/index' });
   },
   async agree() {
     if (this.data.loading) return;
@@ -85,6 +85,6 @@ Page({
       wx.redirectTo({ url: `/pages/register/index?eventId=${encodeURIComponent(eventId)}` });
       return;
     }
-    wx.switchTab({ url: '/pages/events/index' });
+    wx.redirectTo({ url: '/pages/gateway/index' });
   },
 });
