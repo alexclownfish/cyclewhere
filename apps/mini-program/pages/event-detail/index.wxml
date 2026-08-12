@@ -10,7 +10,15 @@
     </view>
     <view class="detail-section">
       <view class="section-kicker">RIDE PLAN</view><view class="form-title">出发信息</view>
-      <view class="info-grid"><view class="info"><text class="info-label">时间</text><text>{{dateText}}</text></view><view class="info"><text class="info-label">集合</text><text>{{event.meetingPoint}}</text></view><view class="info"><text class="info-label">巡航</text><text>{{event.speedRange}}</text></view><view class="info"><text class="info-label">规模</text><text>{{event.registeredCount}} / {{event.capacity}} 人</text></view></view>
+      <view class="info-grid"><view class="info"><text class="info-label">时间</text><text>{{dateText}}</text></view><view class="info location-info" role="button" aria-label="打开集合点地图导航" bindtap="openMeetingPoint"><view class="location-copy"><text class="info-label">集合</text><text>{{event.meetingPoint}}</text><text class="location-hint">地图导航</text></view><text class="location-chevron">›</text></view><view class="info"><text class="info-label">巡航</text><text>{{event.speedRange}}</text></view><view class="info"><text class="info-label">规模</text><text>{{event.registeredCount}} / {{event.capacity}} 人</text></view></view>
+    </view>
+    <view wx:if="{{event.routeId}}" class="detail-section route-entry" role="button" aria-label="查看活动路书" bindtap="openRoute">
+      <view class="row-between">
+        <view><view class="section-kicker">ROADBOOK</view><view class="form-title route-name">{{event.route.name}}</view></view>
+        <view class="chevron">›</view>
+      </view>
+      <view class="route-track"><view class="route-line"></view><view class="route-dot route-start"></view><view class="route-dot route-end"></view></view>
+      <view class="small route-hint">{{event.route.distanceKm}} km · 累计爬升 {{event.route.elevationGainM}} m · 点击查看完整轨迹</view>
     </view>
     <view id="participant-list" class="detail-section participants-section">
       <view class="participants-heading">

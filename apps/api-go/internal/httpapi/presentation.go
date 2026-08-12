@@ -24,6 +24,7 @@ func eventResponse(event domain.Event) gin.H {
 		"id": event.ID, "organizerId": event.OrganizerID, "routeId": event.RouteID,
 		"title": event.Title, "summary": event.Summary, "coverUrl": event.CoverURL, "startAt": isoTime(event.StartAt),
 		"registrationDeadline": isoTime(event.RegistrationDeadline), "meetingPoint": event.MeetingPoint,
+		"meetingLatitude": event.MeetingLatitude, "meetingLongitude": event.MeetingLongitude,
 		"difficulty": event.Difficulty, "distanceKm": event.DistanceKM, "elevationGainM": event.ElevationGainM,
 		"speedMinKph": event.SpeedMinKPH, "speedMaxKph": event.SpeedMaxKPH, "capacity": event.Capacity,
 		"registrationCount": event.RegistrationCount, "equipmentRequirements": equipment,

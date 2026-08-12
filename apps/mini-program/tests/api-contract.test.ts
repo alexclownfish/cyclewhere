@@ -263,7 +263,7 @@ test('publish adapter creates a draft then calls publish endpoint', async () => 
     throw new Error(`unexpected ${spec.url}`);
   };
   const input: PublishEventInput = {
-    title: '西湖群山晨间爬坡', date: '2026-09-13', time: '07:00', meetingPoint: '杭州龙井路停车场入口',
+    title: '西湖群山晨间爬坡', date: '2026-09-13', time: '07:00', meetingPoint: '杭州龙井路停车场入口', meetingLatitude: 30.2, meetingLongitude: 120.1,
     routeId: 'route-1', capacity: 20, speedRange: '24-29 km/h', description: '遵守交通规则，路线可能因天气调整。',
     requirements: { equipment: ['头盔'], recentDistanceKm: 60, recentElevationM: 800, bikeTypes: ['公路车'], disciplines: ['听从领队指挥'] },
   };
@@ -272,6 +272,8 @@ test('publish adapter creates a draft then calls publish endpoint', async () => 
     'GET /api/v1/routes/route-1', 'POST /api/v1/events', 'POST /api/v1/events/event-1/publish',
   ]);
   assert.equal((calls[1].data as { summary: string }).summary, input.description);
+  assert.ok(Math.abs((calls[1].data as any).meetingLatitude - input.meetingLatitude!) < 0.02);
+  assert.ok(Math.abs((calls[1].data as any).meetingLongitude - input.meetingLongitude!) < 0.02);
   assert.equal(event.status, 'published');
 });
 

@@ -103,3 +103,41 @@ test('organizer can cancel an active event and jump to the participant list', as
     api.cancelEvent = original;
   }
 });
+
+test('meeting point opens WeChat native navigation with route coordinates', () => {
+  let location: Record<string, unknown> | undefined;
+  (globalThis as any).wx = { openLocation: (options: Record<string, unknown>) => { location = options; }, showToast: () => undefined };
+  const page = createPage();
+  page.data.event = {
+    meetingPoint: '北邵洼地铁站 B 口',
+    meetingLatitude: 40.2,
+    meetingLongitude: 116.22,
+    route: {
+      pois: [{ kind: 'meeting', latitude: 40.195, longitude: 116.216, name: '北邵洼地铁站', note: 'B 口集合' }],
+      track: [],
+    },
+  };
+  page.openMeetingPoint();
+  assert.deepEqual(location, {
+    latitude: 40.2,
+    longitude: 116.22,
+    name: '北邵洼地铁站 B 口',
+    address: 'B 口集合',
+    scale: 16,
+  });
+});
+
+test('meeting point reports missing coordinates and activity roadbook remains reachable', () => {
+  let toast = '';
+  let target = '';
+  (globalThis as any).wx = {
+    showToast: ({ title }: { title: string }) => { toast = title; },
+    navigateTo: ({ url }: { url: string }) => { target = url; },
+  };
+  const page = createPage();
+  page.data.event = { meetingPoint: '文字集合点', routeId: 'roadbook 1', route: { id: 'roadbook 1', pois: [], track: [] } };
+  page.openMeetingPoint();
+  assert.match(toast, /地图坐标/);
+  page.openRoute();
+  assert.equal(target, '/pages/route-detail/index?id=roadbook%201');
+});

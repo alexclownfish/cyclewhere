@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.wgs84ToGcj02 = wgs84ToGcj02;
+exports.gcj02ToWgs84 = gcj02ToWgs84;
 const PI = Math.PI;
 const AXIS = 6378245;
 const OFFSET = 0.006693421622965943;
@@ -35,4 +36,16 @@ function wgs84ToGcj02(coordinate) {
     latitudeDelta = latitudeDelta * 180 / ((AXIS * (1 - OFFSET)) / (magic * sqrtMagic) * PI);
     longitudeDelta = longitudeDelta * 180 / (AXIS / sqrtMagic * Math.cos(radianLatitude) * PI);
     return { latitude: latitude + latitudeDelta, longitude: longitude + longitudeDelta };
+}
+function gcj02ToWgs84(coordinate) {
+    if (outsideChina(coordinate.latitude, coordinate.longitude))
+        return { ...coordinate };
+    let latitude = coordinate.latitude;
+    let longitude = coordinate.longitude;
+    for (let iteration = 0; iteration < 4; iteration++) {
+        const converted = wgs84ToGcj02({ latitude, longitude });
+        latitude -= converted.latitude - coordinate.latitude;
+        longitude -= converted.longitude - coordinate.longitude;
+    }
+    return { latitude, longitude };
 }

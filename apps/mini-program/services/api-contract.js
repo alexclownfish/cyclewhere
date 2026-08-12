@@ -59,10 +59,14 @@ function fallbackRoute(event) {
 }
 function mapEvent(event, route, currentUserId) {
     const parsedRequirements = parseAbilityRequirements(event.abilityRequirements);
+    const meetingCoordinate = event.meetingLatitude != null && event.meetingLongitude != null
+        ? (0, coordinates_1.wgs84ToGcj02)({ latitude: event.meetingLatitude, longitude: event.meetingLongitude })
+        : null;
     return {
         id: event.id, title: event.title, coverUrl: event.coverUrl || null,
         organizer: event.organizerProfile?.nickname || '活动组织者', organizerAvatarUrl: event.organizerProfile?.avatarUrl || null,
         startAt: event.startAt, registrationDeadline: event.registrationDeadline, meetingPoint: event.meetingPoint,
+        meetingLatitude: meetingCoordinate?.latitude ?? null, meetingLongitude: meetingCoordinate?.longitude ?? null,
         routeId: event.routeId || '', route: route || fallbackRoute(event), capacity: event.capacity,
         registeredCount: event.registrationCount, speedRange: `${event.speedMinKph}-${event.speedMaxKph} km/h`,
         status: event.status === 'draft' ? 'published' : event.status, approvalRequired: false,
@@ -91,9 +95,13 @@ function toCreateEvent(input, route) {
     const customNote = input.requirements.customNote?.trim().slice(0, 200);
     if (customNote && !abilityRequirements.includes(customNote))
         abilityRequirements.push(customNote);
+    const meetingCoordinate = input.meetingLatitude != null && input.meetingLongitude != null
+        ? (0, coordinates_1.gcj02ToWgs84)({ latitude: input.meetingLatitude, longitude: input.meetingLongitude })
+        : null;
     return {
         routeId: input.routeId || null, title: input.title.trim(), summary: input.description.trim(),
         startAt: startAt.toISOString(), registrationDeadline: registrationDeadline.toISOString(), meetingPoint: input.meetingPoint.trim(),
+        meetingLatitude: meetingCoordinate?.latitude ?? null, meetingLongitude: meetingCoordinate?.longitude ?? null,
         difficulty: difficultyToBackend[route?.difficulty || input.difficulty || '中等'],
         distanceKm: route?.distanceKm || input.distanceKm || 0,
         elevationGainM: route?.elevationGainM ?? input.elevationGainM ?? 0,

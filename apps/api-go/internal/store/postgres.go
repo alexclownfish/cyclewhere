@@ -16,7 +16,7 @@ import (
 
 const eventColumns = `
   id, organizer_id, roadbook_id, title, summary, cover_url, start_at, registration_deadline,
-  meeting_point, difficulty, distance_km, elevation_gain_m, speed_min_kph,
+  meeting_point, meeting_latitude, meeting_longitude, difficulty, distance_km, elevation_gain_m, speed_min_kph,
   speed_max_kph, capacity, registration_count, equipment_requirements,
   ability_requirements, safety_notice, status, created_at, updated_at, version`
 
@@ -113,14 +113,14 @@ func (p *Postgres) CreateEvent(ctx context.Context, event domain.Event) (domain.
 	ability, _ := json.Marshal(event.AbilityRequirements)
 	row := p.pool.QueryRow(ctx, `INSERT INTO events (
     id, organizer_id, roadbook_id, title, summary, cover_url, start_at, registration_deadline,
-    meeting_point, difficulty, distance_km, elevation_gain_m, speed_min_kph,
+    meeting_point, meeting_latitude, meeting_longitude, difficulty, distance_km, elevation_gain_m, speed_min_kph,
     speed_max_kph, capacity, registration_count, equipment_requirements,
     ability_requirements, safety_notice, status, created_at, updated_at, version
-  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18::jsonb,$19,$20,$21,$22,$23)
+  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20::jsonb,$21,$22,$23,$24,$25)
   RETURNING `+eventColumns,
 		event.ID, event.OrganizerID, event.RouteID, event.Title, event.Summary, event.CoverURL, event.StartAt,
-		event.RegistrationDeadline, event.MeetingPoint, event.Difficulty, event.DistanceKM,
-		event.ElevationGainM, event.SpeedMinKPH, event.SpeedMaxKPH, event.Capacity,
+		event.RegistrationDeadline, event.MeetingPoint, event.MeetingLatitude, event.MeetingLongitude,
+		event.Difficulty, event.DistanceKM, event.ElevationGainM, event.SpeedMinKPH, event.SpeedMaxKPH, event.Capacity,
 		event.RegistrationCount, string(equipment), string(ability), event.SafetyNotice, event.Status,
 		event.CreatedAt, event.UpdatedAt, event.Version)
 	created, err := scanEvent(row)
@@ -132,14 +132,14 @@ func (p *Postgres) UpdateEvent(ctx context.Context, event domain.Event) (domain.
 	ability, _ := json.Marshal(event.AbilityRequirements)
 	updated, err := scanEvent(p.pool.QueryRow(ctx, `UPDATE events SET
 	    roadbook_id=$2,title=$3,summary=$4,cover_url=$5,start_at=$6,registration_deadline=$7,
-	    meeting_point=$8,difficulty=$9,distance_km=$10,elevation_gain_m=$11,
-	    speed_min_kph=$12,speed_max_kph=$13,capacity=$14,registration_count=$15,
-	    equipment_requirements=$16::jsonb,ability_requirements=$17::jsonb,
-	    safety_notice=$18,status=$19,updated_at=$20,version=$21
-	WHERE id=$1 AND version=$22 RETURNING `+eventColumns,
+	    meeting_point=$8,meeting_latitude=$9,meeting_longitude=$10,difficulty=$11,distance_km=$12,elevation_gain_m=$13,
+	    speed_min_kph=$14,speed_max_kph=$15,capacity=$16,registration_count=$17,
+	    equipment_requirements=$18::jsonb,ability_requirements=$19::jsonb,
+	    safety_notice=$20,status=$21,updated_at=$22,version=$23
+	WHERE id=$1 AND version=$24 RETURNING `+eventColumns,
 		event.ID, event.RouteID, event.Title, event.Summary, event.CoverURL, event.StartAt,
-		event.RegistrationDeadline, event.MeetingPoint, event.Difficulty, event.DistanceKM,
-		event.ElevationGainM, event.SpeedMinKPH, event.SpeedMaxKPH, event.Capacity,
+		event.RegistrationDeadline, event.MeetingPoint, event.MeetingLatitude, event.MeetingLongitude,
+		event.Difficulty, event.DistanceKM, event.ElevationGainM, event.SpeedMinKPH, event.SpeedMaxKPH, event.Capacity,
 		event.RegistrationCount, string(equipment), string(ability), event.SafetyNotice, event.Status,
 		event.UpdatedAt, event.Version, event.Version-1))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -516,7 +516,7 @@ func scanEvent(row scanner) (domain.Event, error) {
 	var routeID *string
 	var equipment, ability []byte
 	err := row.Scan(&event.ID, &event.OrganizerID, &routeID, &event.Title, &event.Summary, &event.CoverURL,
-		&event.StartAt, &event.RegistrationDeadline, &event.MeetingPoint, &event.Difficulty,
+		&event.StartAt, &event.RegistrationDeadline, &event.MeetingPoint, &event.MeetingLatitude, &event.MeetingLongitude, &event.Difficulty,
 		&event.DistanceKM, &event.ElevationGainM, &event.SpeedMinKPH, &event.SpeedMaxKPH,
 		&event.Capacity, &event.RegistrationCount, &equipment, &ability, &event.SafetyNotice,
 		&event.Status, &event.CreatedAt, &event.UpdatedAt, &event.Version)
@@ -584,7 +584,7 @@ func scanUserRegistration(row scanner) (domain.Registration, domain.Event, error
 		&registration.WaiverVersion, &registration.WaiverAcceptedAt, &registration.CreatedAt,
 		&registration.UpdatedAt, &registration.CancelledAt,
 		&event.ID, &event.OrganizerID, &routeID, &event.Title, &event.Summary, &event.CoverURL,
-		&event.StartAt, &event.RegistrationDeadline, &event.MeetingPoint, &event.Difficulty,
+		&event.StartAt, &event.RegistrationDeadline, &event.MeetingPoint, &event.MeetingLatitude, &event.MeetingLongitude, &event.Difficulty,
 		&event.DistanceKM, &event.ElevationGainM, &event.SpeedMinKPH, &event.SpeedMaxKPH,
 		&event.Capacity, &event.RegistrationCount, &equipment, &ability, &event.SafetyNotice,
 		&event.Status, &event.CreatedAt, &event.UpdatedAt, &event.Version)

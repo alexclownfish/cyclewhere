@@ -31,6 +31,8 @@ type Event struct {
 	StartAt               time.Time   `json:"startAt"`
 	RegistrationDeadline  time.Time   `json:"registrationDeadline"`
 	MeetingPoint          string      `json:"meetingPoint"`
+	MeetingLatitude       *float64    `json:"meetingLatitude"`
+	MeetingLongitude      *float64    `json:"meetingLongitude"`
 	Difficulty            Difficulty  `json:"difficulty"`
 	DistanceKM            float64     `json:"distanceKm"`
 	ElevationGainM        int         `json:"elevationGainM"`

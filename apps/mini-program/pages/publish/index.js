@@ -16,7 +16,7 @@ Page({
         appleModal: { visible: false, title: '', content: '', showCancel: true, cancelText: '取消', confirmText: '好', destructive: false },
         authChecking: true, authReady: false, authError: '', routesError: '',
         form: {
-            title: '', date: '2026-08-15', time: '06:30', meetingPoint: '',
+            title: '', date: '2026-08-15', time: '06:30', meetingPoint: '', meetingLatitude: undefined, meetingLongitude: undefined,
             routeId: '', distanceKm: 0, elevationGainM: 0, difficulty: '中等', capacity: 16, speedRange: '23-26 km/h',
             description: '',
             requirements: { equipment: [], recentDistanceKm: 50, recentElevationM: 400, bikeTypes: [], disciplines: [], customNote: '' },
@@ -65,7 +65,7 @@ Page({
             const foundIndex = this.data.routes.findIndex((item) => item.id === event.routeId);
             const selectedRoute = foundIndex >= 0 ? this.data.routes[foundIndex] : null;
             const difficultyIndex = Math.max(0, this.data.difficultyOptions.indexOf(event.route.difficulty));
-            this.setData({ routeIndex: foundIndex >= 0 ? foundIndex + 1 : 0, selectedRoute, difficultyIndex, coverPreview: event.coverUrl || '', 'form.title': event.title, 'form.date': `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`, 'form.time': `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`, 'form.meetingPoint': event.meetingPoint, 'form.capacity': event.capacity, 'form.speedRange': event.speedRange, 'form.description': event.description, 'form.routeId': event.routeId, 'form.distanceKm': event.route.distanceKm, 'form.elevationGainM': event.route.elevationGainM, 'form.difficulty': event.route.difficulty, 'form.requirements': event.requirements });
+            this.setData({ routeIndex: foundIndex >= 0 ? foundIndex + 1 : 0, selectedRoute, difficultyIndex, coverPreview: event.coverUrl || '', 'form.title': event.title, 'form.date': `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`, 'form.time': `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`, 'form.meetingPoint': event.meetingPoint, 'form.meetingLatitude': event.meetingLatitude ?? undefined, 'form.meetingLongitude': event.meetingLongitude ?? undefined, 'form.capacity': event.capacity, 'form.speedRange': event.speedRange, 'form.description': event.description, 'form.routeId': event.routeId, 'form.distanceKm': event.route.distanceKm, 'form.elevationGainM': event.route.elevationGainM, 'form.difficulty': event.route.difficulty, 'form.requirements': event.requirements });
             this.setData({ equipmentOptions: this.data.equipmentOptions.map((item) => ({ ...item, selected: event.requirements.equipment.includes(item.label) })), bikeOptions: this.data.bikeOptions.map((item) => ({ ...item, selected: event.requirements.bikeTypes.includes(item.label) })), disciplineOptions: this.data.disciplineOptions.map((item) => ({ ...item, selected: event.requirements.disciplines.includes(item.label) })) });
         }
         catch (error) {
@@ -101,8 +101,10 @@ Page({
         const field = String(event.currentTarget.dataset.field || '');
         const value = event.detail.value;
         this.setData({ [`form.${field}`]: value });
-        if (field === 'meetingPoint')
+        if (field === 'meetingPoint') {
+            this.setData({ 'form.meetingLatitude': undefined, 'form.meetingLongitude': undefined });
             this.updateLocationSuggestions(value);
+        }
     },
     onKeyboardOpen() {
         if (keyboardCloseTimer)
@@ -128,7 +130,7 @@ Page({
         const recent = (wx.getStorageSync(RECENT_MEETING_POINTS_KEY) || []);
         const routePoints = this.data.routes.flatMap((route) => route.pois
             .filter((poi) => poi.kind === 'meeting' || poi.kind === 'supply')
-            .map((poi) => ({ label: poi.name, note: `${route.name} · ${poi.note}` })));
+            .map((poi) => ({ label: poi.name, note: `${route.name} · ${poi.note}`, latitude: poi.latitude, longitude: poi.longitude })));
         const recentPoints = recent.map((label) => ({ label, note: '最近使用' }));
         const seen = new Set();
         const suggestions = [...recentPoints, ...routePoints]
@@ -142,9 +144,10 @@ Page({
         const label = String(event.currentTarget.dataset.label || '');
         if (!label)
             return;
+        const selected = this.data.locationSuggestions.find((item) => item.label === label);
         const recent = (wx.getStorageSync(RECENT_MEETING_POINTS_KEY) || []);
         wx.setStorageSync(RECENT_MEETING_POINTS_KEY, [label, ...recent.filter((item) => item !== label)].slice(0, 8));
-        this.setData({ 'form.meetingPoint': label, showLocationSuggestions: false });
+        this.setData({ 'form.meetingPoint': label, 'form.meetingLatitude': selected?.latitude, 'form.meetingLongitude': selected?.longitude, showLocationSuggestions: false });
     },
     chooseMeetingPointOnMap() {
         wx.chooseLocation({
@@ -154,7 +157,7 @@ Page({
                 const label = result.name || result.address;
                 const recent = (wx.getStorageSync(RECENT_MEETING_POINTS_KEY) || []);
                 wx.setStorageSync(RECENT_MEETING_POINTS_KEY, [label, ...recent.filter((item) => item !== label)].slice(0, 8));
-                this.setData({ 'form.meetingPoint': label, showLocationSuggestions: false });
+                this.setData({ 'form.meetingPoint': label, 'form.meetingLatitude': result.latitude, 'form.meetingLongitude': result.longitude, showLocationSuggestions: false });
             },
             fail: () => undefined,
         });
@@ -171,7 +174,7 @@ Page({
         this.setData({
             editingId: '', selectedRoute: null, routeIndex: 0, coverPreview: '', locationSuggestions: [], showLocationSuggestions: false, keyboardOpen: false,
             form: {
-                title: '', date, time: '06:30', meetingPoint: '', routeId: '', distanceKm: 0, elevationGainM: 0,
+                title: '', date, time: '06:30', meetingPoint: '', meetingLatitude: undefined, meetingLongitude: undefined, routeId: '', distanceKm: 0, elevationGainM: 0,
                 difficulty: '中等', capacity: 16, speedRange: '23-26 km/h', description: '',
                 requirements: { equipment: [], recentDistanceKm: 50, recentElevationM: 400, bikeTypes: [], disciplines: [], customNote: '' },
             },

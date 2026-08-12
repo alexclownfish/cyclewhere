@@ -41,3 +41,15 @@ export function wgs84ToGcj02(coordinate: Coordinate): Coordinate {
   longitudeDelta = longitudeDelta * 180 / (AXIS / sqrtMagic * Math.cos(radianLatitude) * PI);
   return { latitude: latitude + latitudeDelta, longitude: longitude + longitudeDelta };
 }
+
+export function gcj02ToWgs84(coordinate: Coordinate): Coordinate {
+  if (outsideChina(coordinate.latitude, coordinate.longitude)) return { ...coordinate };
+  let latitude = coordinate.latitude;
+  let longitude = coordinate.longitude;
+  for (let iteration = 0; iteration < 4; iteration++) {
+    const converted = wgs84ToGcj02({ latitude, longitude });
+    latitude -= converted.latitude - coordinate.latitude;
+    longitude -= converted.longitude - coordinate.longitude;
+  }
+  return { latitude, longitude };
+}

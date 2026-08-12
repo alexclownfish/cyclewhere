@@ -1,5 +1,5 @@
 import type { PublishEventInput, Registration, RideEvent, RideRoute } from '../types/domain';
-import { wgs84ToGcj02 } from '../utils/coordinates';
+import { gcj02ToWgs84, wgs84ToGcj02 } from '../utils/coordinates';
 
 export type BackendDifficulty = 'easy' | 'moderate' | 'challenging' | 'expert';
 export type BackendEventStatus = 'draft' | 'published' | 'full' | 'completed' | 'cancelled';
@@ -7,7 +7,7 @@ export type BackendEventStatus = 'draft' | 'published' | 'full' | 'completed' | 
 export interface BackendPage<T> { items: T[]; nextCursor: string | null; }
 export interface BackendEvent {
   id: string; organizerId?: string; routeId: string | null; title: string; summary: string; coverUrl?: string | null; startAt: string;
-  registrationDeadline: string; meetingPoint: string; difficulty: BackendDifficulty; distanceKm: number;
+  registrationDeadline: string; meetingPoint: string; meetingLatitude?: number | null; meetingLongitude?: number | null; difficulty: BackendDifficulty; distanceKm: number;
   elevationGainM: number; speedMinKph: number; speedMaxKph: number; capacity: number; registrationCount: number;
   equipmentRequirements: string[]; abilityRequirements: string[]; safetyNotice: string; status: BackendEventStatus;
   createdAt: string; updatedAt: string; version: number;
@@ -39,7 +39,7 @@ export interface BackendEventParticipant {
 }
 export interface CreateBackendEvent {
   routeId: string | null; title: string; summary: string; startAt: string; registrationDeadline: string;
-  meetingPoint: string; difficulty: BackendDifficulty; distanceKm: number; elevationGainM: number;
+  meetingPoint: string; meetingLatitude: number | null; meetingLongitude: number | null; difficulty: BackendDifficulty; distanceKm: number; elevationGainM: number;
   speedMinKph: number; speedMaxKph: number; capacity: number; equipmentRequirements: string[];
   abilityRequirements: string[]; safetyNotice: string;
 }
@@ -103,10 +103,14 @@ export function fallbackRoute(event: BackendEvent): RideRoute {
 
 export function mapEvent(event: BackendEvent, route: RideRoute | undefined, currentUserId: string): RideEvent {
   const parsedRequirements = parseAbilityRequirements(event.abilityRequirements);
+  const meetingCoordinate = event.meetingLatitude != null && event.meetingLongitude != null
+    ? wgs84ToGcj02({ latitude: event.meetingLatitude, longitude: event.meetingLongitude })
+    : null;
   return {
     id: event.id, title: event.title, coverUrl: event.coverUrl || null,
     organizer: event.organizerProfile?.nickname || '活动组织者', organizerAvatarUrl: event.organizerProfile?.avatarUrl || null,
     startAt: event.startAt, registrationDeadline: event.registrationDeadline, meetingPoint: event.meetingPoint,
+    meetingLatitude: meetingCoordinate?.latitude ?? null, meetingLongitude: meetingCoordinate?.longitude ?? null,
     routeId: event.routeId || '', route: route || fallbackRoute(event), capacity: event.capacity,
     registeredCount: event.registrationCount, speedRange: `${event.speedMinKph}-${event.speedMaxKph} km/h`,
     status: event.status === 'draft' ? 'published' : event.status, approvalRequired: false,
@@ -136,9 +140,13 @@ export function toCreateEvent(input: PublishEventInput, route?: RideRoute): Crea
   ])];
   const customNote = input.requirements.customNote?.trim().slice(0, 200);
   if (customNote && !abilityRequirements.includes(customNote)) abilityRequirements.push(customNote);
+  const meetingCoordinate = input.meetingLatitude != null && input.meetingLongitude != null
+    ? gcj02ToWgs84({ latitude: input.meetingLatitude, longitude: input.meetingLongitude })
+    : null;
   return {
     routeId: input.routeId || null, title: input.title.trim(), summary: input.description.trim(),
     startAt: startAt.toISOString(), registrationDeadline: registrationDeadline.toISOString(), meetingPoint: input.meetingPoint.trim(),
+    meetingLatitude: meetingCoordinate?.latitude ?? null, meetingLongitude: meetingCoordinate?.longitude ?? null,
     difficulty: difficultyToBackend[route?.difficulty || input.difficulty || '中等'],
     distanceKm: route?.distanceKm || input.distanceKm || 0,
     elevationGainM: route?.elevationGainM ?? input.elevationGainM ?? 0,

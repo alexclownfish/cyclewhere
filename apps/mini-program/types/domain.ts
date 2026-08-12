@@ -44,6 +44,8 @@ export interface RideEvent {
   startAt: string;
   registrationDeadline: string;
   meetingPoint: string;
+  meetingLatitude?: number | null;
+  meetingLongitude?: number | null;
   routeId: string;
   route: RideRoute;
   capacity: number;
@@ -83,6 +85,8 @@ export interface PublishEventInput {
   date: string;
   time: string;
   meetingPoint: string;
+  meetingLatitude?: number;
+  meetingLongitude?: number;
   routeId: string;
   distanceKm?: number;
   elevationGainM?: number;

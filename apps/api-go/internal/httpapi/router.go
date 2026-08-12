@@ -1006,6 +1006,27 @@ func (a *API) updateEvent(c *gin.Context) {
 		}
 		patch.RouteID = &route
 	}
+	if latitudeValue, latitudeExists := raw["meetingLatitude"]; latitudeExists {
+		longitudeValue, longitudeExists := raw["meetingLongitude"]
+		if !longitudeExists {
+			writeValidation(c)
+			return
+		}
+		var latitude, longitude *float64
+		if !bytes.Equal(bytes.TrimSpace(latitudeValue), []byte("null")) && json.Unmarshal(latitudeValue, &latitude) != nil {
+			writeValidation(c)
+			return
+		}
+		if !bytes.Equal(bytes.TrimSpace(longitudeValue), []byte("null")) && json.Unmarshal(longitudeValue, &longitude) != nil {
+			writeValidation(c)
+			return
+		}
+		patch.MeetingLatitude = &latitude
+		patch.MeetingLongitude = &longitude
+	} else if _, longitudeExists := raw["meetingLongitude"]; longitudeExists {
+		writeValidation(c)
+		return
+	}
 	event, err := a.catalog.UpdateEvent(c.Request.Context(), c.Param("id"), userID(c), patch)
 	if err != nil {
 		writeError(c, err)

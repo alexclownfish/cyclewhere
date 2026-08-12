@@ -100,6 +100,34 @@ Page({
             return wx.showToast({ title: '当前不可报名', icon: 'none' });
         wx.navigateTo({ url: `/pages/register/index?eventId=${this.data.id}` });
     },
+    openMeetingPoint() {
+        const event = this.data.event;
+        if (!event)
+            return;
+        const meetingPoint = event.route.pois.find((point) => point.kind === 'meeting');
+        const coordinate = event.meetingLatitude != null && event.meetingLongitude != null
+            ? { latitude: event.meetingLatitude, longitude: event.meetingLongitude }
+            : meetingPoint || event.route.track[0];
+        if (!coordinate) {
+            wx.showToast({ title: '集合点暂未设置地图坐标', icon: 'none' });
+            return;
+        }
+        wx.openLocation({
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            name: event.meetingPoint,
+            address: meetingPoint?.note || meetingPoint?.name || event.meetingPoint,
+            scale: 16,
+        });
+    },
+    openRoute() {
+        const routeId = this.data.event?.routeId;
+        if (!routeId) {
+            wx.showToast({ title: '该活动暂未关联路书', icon: 'none' });
+            return;
+        }
+        wx.navigateTo({ url: `/pages/route-detail/index?id=${encodeURIComponent(routeId)}` });
+    },
     viewParticipants() {
         wx.pageScrollTo({ selector: '#participant-list', duration: 280 });
     },

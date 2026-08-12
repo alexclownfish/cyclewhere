@@ -28,14 +28,14 @@ test('privacy entry is the startup page and exposes browse before login', () => 
   assert.match(markup, /同意并继续/);
 });
 
-test('roadbook tab and detail route are disabled while publish roadbook support remains', () => {
+test('roadbook tab stays hidden while activity and publish roadbook flows remain', () => {
   const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
   const detailMarkup = readFileSync(new URL('../pages/event-detail/index.wxml', import.meta.url), 'utf8');
   const publishMarkup = readFileSync(new URL('../pages/publish/index.wxml', import.meta.url), 'utf8');
   assert.equal(appConfig.pages.includes('pages/routes/index'), false);
-  assert.equal(appConfig.pages.includes('pages/route-detail/index'), false);
+  assert.equal(appConfig.pages.includes('pages/route-detail/index'), true);
   assert.equal(appConfig.tabBar.list.some((item: { pagePath: string }) => item.pagePath === 'pages/routes/index'), false);
-  assert.doesNotMatch(detailMarkup, /bindtap="openRoute"/);
+  assert.match(detailMarkup, /bindtap="openRoute"/);
   assert.match(publishMarkup, /导入自己的路书/);
 });
 

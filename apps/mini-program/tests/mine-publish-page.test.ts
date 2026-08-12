@@ -56,6 +56,32 @@ test('meeting point input suggests recent and route points', () => {
   assert.equal(page.data.locationSuggestions[0].label, '北邵洼地铁站');
 });
 
+test('map selection keeps coordinates for activity navigation and typing clears stale coordinates', () => {
+  (globalThis as any).wx = {
+    getStorageSync: () => [],
+    setStorageSync: () => undefined,
+    chooseLocation: ({ success }: { success: (result: Record<string, unknown>) => void }) => success({ name: '龙井停车场', address: '龙井路', latitude: 30.2, longitude: 120.1 }),
+  };
+  const page = {
+    ...publishDefinition,
+    data: structuredClone(publishDefinition.data),
+    setData(update: Record<string, unknown>) {
+      for (const [path, value] of Object.entries(update)) {
+        const parts = path.split('.');
+        const leaf = parts.pop() as string;
+        const target = parts.reduce((current: Record<string, any>, part) => current[part], this.data as Record<string, any>);
+        target[leaf] = value;
+      }
+    },
+  };
+  page.chooseMeetingPointOnMap();
+  assert.equal(page.data.form.meetingLatitude, 30.2);
+  assert.equal(page.data.form.meetingLongitude, 120.1);
+  page.onField({ currentTarget: { dataset: { field: 'meetingPoint' } }, detail: { value: '手动输入地点' } });
+  assert.equal(page.data.form.meetingLatitude, undefined);
+  assert.equal(page.data.form.meetingLongitude, undefined);
+});
+
 test('keyboard focus hides the sticky publish action until input blur settles', async () => {
   const markup = readFileSync(new URL('../pages/publish/index.wxml', import.meta.url), 'utf8');
   const page = {

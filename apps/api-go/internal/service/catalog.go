@@ -30,6 +30,8 @@ type EventInput struct {
 	StartAt               time.Time         `json:"startAt"`
 	RegistrationDeadline  time.Time         `json:"registrationDeadline"`
 	MeetingPoint          string            `json:"meetingPoint"`
+	MeetingLatitude       *float64          `json:"meetingLatitude"`
+	MeetingLongitude      *float64          `json:"meetingLongitude"`
 	Difficulty            domain.Difficulty `json:"difficulty"`
 	DistanceKM            float64           `json:"distanceKm"`
 	ElevationGainM        int               `json:"elevationGainM"`
@@ -49,6 +51,8 @@ type EventPatch struct {
 	StartAt               *time.Time         `json:"startAt"`
 	RegistrationDeadline  *time.Time         `json:"registrationDeadline"`
 	MeetingPoint          *string            `json:"meetingPoint"`
+	MeetingLatitude       **float64          `json:"meetingLatitude"`
+	MeetingLongitude      **float64          `json:"meetingLongitude"`
 	Difficulty            *domain.Difficulty `json:"difficulty"`
 	DistanceKM            *float64           `json:"distanceKm"`
 	ElevationGainM        *int               `json:"elevationGainM"`
@@ -129,7 +133,8 @@ func (s *Catalog) CreateEvent(ctx context.Context, organizerID string, input Eve
 		ID: uuid.NewString(), OrganizerID: organizerID, RouteID: input.RouteID,
 		Title: strings.TrimSpace(input.Title), Summary: strings.TrimSpace(input.Summary),
 		StartAt: input.StartAt, RegistrationDeadline: input.RegistrationDeadline,
-		MeetingPoint: strings.TrimSpace(input.MeetingPoint), Difficulty: input.Difficulty,
+		MeetingPoint: strings.TrimSpace(input.MeetingPoint), MeetingLatitude: input.MeetingLatitude,
+		MeetingLongitude: input.MeetingLongitude, Difficulty: input.Difficulty,
 		DistanceKM: input.DistanceKM, ElevationGainM: input.ElevationGainM,
 		SpeedMinKPH: input.SpeedMinKPH, SpeedMaxKPH: input.SpeedMaxKPH,
 		Capacity: input.Capacity, EquipmentRequirements: cleanStrings(input.EquipmentRequirements),
@@ -297,6 +302,12 @@ func applyEventPatch(event *domain.Event, patch EventPatch) {
 	if patch.MeetingPoint != nil {
 		event.MeetingPoint = strings.TrimSpace(*patch.MeetingPoint)
 	}
+	if patch.MeetingLatitude != nil {
+		event.MeetingLatitude = *patch.MeetingLatitude
+	}
+	if patch.MeetingLongitude != nil {
+		event.MeetingLongitude = *patch.MeetingLongitude
+	}
 	if patch.Difficulty != nil {
 		event.Difficulty = *patch.Difficulty
 	}
@@ -350,7 +361,8 @@ func validateEventInput(input EventInput) error {
 	event := domain.Event{
 		RouteID: input.RouteID, Title: strings.TrimSpace(input.Title), Summary: strings.TrimSpace(input.Summary),
 		StartAt: input.StartAt, RegistrationDeadline: input.RegistrationDeadline,
-		MeetingPoint: strings.TrimSpace(input.MeetingPoint), Difficulty: input.Difficulty,
+		MeetingPoint: strings.TrimSpace(input.MeetingPoint), MeetingLatitude: input.MeetingLatitude,
+		MeetingLongitude: input.MeetingLongitude, Difficulty: input.Difficulty,
 		DistanceKM: input.DistanceKM, ElevationGainM: input.ElevationGainM,
 		SpeedMinKPH: input.SpeedMinKPH, SpeedMaxKPH: input.SpeedMaxKPH, Capacity: input.Capacity,
 		EquipmentRequirements: cleanStrings(input.EquipmentRequirements), AbilityRequirements: cleanStrings(input.AbilityRequirements),
@@ -374,6 +386,12 @@ func validateEvent(event domain.Event) error {
 	}
 	if length := len([]rune(event.MeetingPoint)); length < 2 || length > 200 {
 		return invalid("meetingPoint", "length must be between 2 and 200")
+	}
+	if (event.MeetingLatitude == nil) != (event.MeetingLongitude == nil) {
+		return invalid("meetingLocation", "latitude and longitude must be provided together")
+	}
+	if event.MeetingLatitude != nil && (*event.MeetingLatitude < -90 || *event.MeetingLatitude > 90 || *event.MeetingLongitude < -180 || *event.MeetingLongitude > 180) {
+		return invalid("meetingLocation", "invalid latitude or longitude")
 	}
 	if !validDifficulty(event.Difficulty) {
 		return invalid("difficulty", "unsupported value")

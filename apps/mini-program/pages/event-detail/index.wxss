@@ -15,6 +15,10 @@
 .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28rpx 22rpx; }
 .info { min-width: 0; padding: 18rpx; border-radius: 18rpx; background: var(--canvas); line-height: 1.5; }
 .info-label { display: block; margin-bottom: 5rpx; color: var(--muted); font-size: 23rpx; }
+.location-info { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; background: var(--green-soft); }
+.location-copy { min-width: 0; }
+.location-hint { display: block; margin-top: 7rpx; color: var(--green-strong); font-size: 20rpx; font-weight: 650; }
+.location-chevron { flex: 0 0 auto; color: var(--green); font-size: 45rpx; font-weight: 400; line-height: 1; }
 .participants-section { min-height: 220rpx; }
 .participants-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24rpx; }
 .participants-heading .form-title { margin-bottom: 0; }

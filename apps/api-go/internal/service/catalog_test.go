@@ -166,6 +166,34 @@ func TestCancelEventRequiresOrganizerAndPublishedState(t *testing.T) {
 	}
 }
 
+func TestEventMeetingCoordinatesMustBeCompleteAndValid(t *testing.T) {
+	repository := newTestRepository()
+	catalog := NewCatalog(repository, func() time.Time { return fixedNow })
+	input := EventInput{
+		Title: "Map meeting ride", Summary: "A safe group ride with a mapped meeting location.",
+		StartAt: fixedNow.Add(48 * time.Hour), RegistrationDeadline: fixedNow.Add(24 * time.Hour),
+		MeetingPoint: "Riverside plaza", Difficulty: domain.DifficultyModerate, DistanceKM: 50,
+		ElevationGainM: 300, SpeedMinKPH: 20, SpeedMaxKPH: 25, Capacity: 10,
+		EquipmentRequirements: []string{"Helmet"}, AbilityRequirements: []string{"Recent ride"}, SafetyNotice: "Follow the ride leader and traffic rules.",
+	}
+	latitude := 30.2
+	input.MeetingLatitude = &latitude
+	_, err := catalog.CreateEvent(context.Background(), "owner-1", input)
+	var domainError *domain.Error
+	if !errors.As(err, &domainError) || domainError.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected incomplete coordinate validation, got %v", err)
+	}
+	longitude := 120.1
+	input.MeetingLongitude = &longitude
+	event, err := catalog.CreateEvent(context.Background(), "owner-1", input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event.MeetingLatitude == nil || event.MeetingLongitude == nil || *event.MeetingLatitude != latitude || *event.MeetingLongitude != longitude {
+		t.Fatalf("meeting coordinates were not preserved: %+v", event)
+	}
+}
+
 func TestRegisterValidatesIdempotencyAndConfirmations(t *testing.T) {
 	repository := newTestRepository()
 	catalog := NewCatalog(repository, func() time.Time { return fixedNow })
@@ -235,16 +263,40 @@ func TestImportGPXRejectsZeroDistanceBeforeRepositoryWrite(t *testing.T) {
 	}
 }
 
-func TestImportGPXRejectsUnsupportedGradientBeforeRepositoryWrite(t *testing.T) {
+func TestParseGPXIgnoresSegmentGapsAndMissingElevation(t *testing.T) {
+	xml := []byte(`<gpx><trk><trkseg><trkpt lat="30" lon="120"><ele>100</ele></trkpt><trkpt lat="30.001" lon="120"/></trkseg><trkseg><trkpt lat="31" lon="121"/><trkpt lat="31.001" lon="121"><ele>120</ele></trkpt></trkseg></trk></gpx>`)
+	parsed, err := parseGPX(xml, "fallback")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.DistanceKM < 0.20 || parsed.DistanceKM > 0.25 {
+		t.Fatalf("segment gap was included in distance: %.2f km", parsed.DistanceKM)
+	}
+	if parsed.ElevationGainM != 0 {
+		t.Fatalf("missing elevation created false gain: %d m", parsed.ElevationGainM)
+	}
+}
+
+func TestImportGPXToleratesShortIntervalElevationNoise(t *testing.T) {
 	repository := newTestRepository()
 	catalog := NewCatalog(repository, func() time.Time { return fixedNow })
-	xml := []byte(`<gpx><trk><trkseg><trkpt lat="30" lon="120"><ele>0</ele></trkpt><trkpt lat="30.0001" lon="120"><ele>20</ele></trkpt></trkseg></trk></gpx>`)
+	xml := []byte(`<gpx><trk><trkseg><trkpt lat="30" lon="120"><ele>100</ele></trkpt><trkpt lat="30.00001" lon="120"><ele>120</ele></trkpt><trkpt lat="30.0003" lon="120"><ele>101</ele></trkpt><trkpt lat="30.0006" lon="120"><ele>102</ele></trkpt></trkseg></trk></gpx>`)
+	roadbook, err := catalog.ImportGPX(context.Background(), "owner-1", xml, GPXMetadata{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if roadbook.MaxGradient > 100 || roadbook.ElevationGainM > 10 {
+		t.Fatalf("elevation noise was not filtered: %+v", roadbook)
+	}
+}
+
+func TestImportGPXRejectsTracksOverOneThousandKilometers(t *testing.T) {
+	repository := newTestRepository()
+	catalog := NewCatalog(repository, func() time.Time { return fixedNow })
+	xml := []byte(`<gpx><trk><trkseg><trkpt lat="0" lon="0"><ele>0</ele></trkpt><trkpt lat="0" lon="10"><ele>0</ele></trkpt></trkseg></trk></gpx>`)
 	_, err := catalog.ImportGPX(context.Background(), "owner-1", xml, GPXMetadata{})
 	var domainError *domain.Error
-	if !errors.As(err, &domainError) || domainError.Code != "GPX_INVALID" || domainError.StatusCode != 400 {
-		t.Fatalf("expected GPX_INVALID 400, got %v", err)
-	}
-	if len(repository.roadbooks) != 0 {
-		t.Fatal("invalid GPX reached the repository")
+	if !errors.As(err, &domainError) || domainError.Code != "GPX_INVALID" || !strings.Contains(domainError.Message, "1000") {
+		t.Fatalf("expected specific distance error, got %v", err)
 	}
 }
