@@ -15,6 +15,7 @@
 .change-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; }.change-tip { margin-top: 7rpx; color: var(--muted); font-size: 22rpx; }
 .counter { color: var(--muted); font-size: 22rpx; }.counter-limit { color: #c24132; }
 .summary-input { box-sizing: border-box; width: 100%; height: 164rpx; margin-top: 22rpx; padding: 22rpx; border: 1rpx solid rgba(20,39,31,.12); border-radius: 18rpx; background: #f7faf8; font-size: 26rpx; line-height: 1.6; }
+.summary-input.auto-summary[disabled] { opacity: 1; color: var(--ink); }
 .preview { margin-top: 20rpx; padding: 22rpx; border-left: 6rpx solid var(--green); border-radius: 8rpx 18rpx 18rpx 8rpx; background: var(--green-soft); }
 .preview-label { color: var(--green); font-size: 20rpx; font-weight: 700; }.preview-title { margin-top: 8rpx; color: var(--ink); font-size: 25rpx; font-weight: 750; }.preview-copy { margin-top: 8rpx; color: #44544d; font-size: 24rpx; line-height: 1.55; }
 input[disabled], textarea[disabled] { opacity: .62; }

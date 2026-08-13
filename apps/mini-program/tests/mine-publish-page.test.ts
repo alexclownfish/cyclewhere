@@ -137,4 +137,8 @@ test('independent edit page enforces summary and three-change quota in the UI', 
   assert.doesNotMatch(source, /switchTab\([^)]*publish/);
   assert.match(source, /error instanceof ApiError/);
   assert.doesNotMatch(source, /description: event\.description, coverUrl: event\.coverUrl/);
+  assert.match(source, /buildAutomaticChangeSummary/);
+  assert.match(source, /活动信息没有发生变化/);
+  assert.doesNotMatch(markup, /bindinput="onSummary"/);
+  assert.match(markup, /系统根据修改内容自动生成/);
 });

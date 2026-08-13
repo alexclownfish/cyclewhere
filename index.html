@@ -930,7 +930,7 @@
               </section>
               <section class="form-section">
                 <h2>参与者提醒</h2>
-                <div class="field change-summary-box"><label for="changeSummary">变更摘要</label><textarea id="changeSummary" maxlength="80">集合时间调整至 07:00，集合点改为苹果园地铁站 D 口。</textarea><div class="summary-counter"><span id="summaryCount">30</span> / 80</div></div>
+                <div class="field change-summary-box"><label for="changeSummary">自动生成的变更摘要</label><textarea id="changeSummary" maxlength="80" readonly>出发时间改为 2026-08-08 07:00；集合地点改为「苹果园地铁站 D 口」</textarea><div class="summary-counter"><span id="summaryCount">48</span> / 80</div></div>
                 <div class="notice-preview"><div class="notice-preview-head"><span>参与者看到的提醒</span><span>预览</span></div><strong><i data-lucide="bell-ring" style="width:15px;vertical-align:-3px;color:#b76800"></i> 妙峰山晨骑挑战有重要变更</strong><p id="changePreviewText">集合时间调整至 07:00，集合点改为苹果园地铁站 D 口。</p></div>
                 <button class="text-btn primary" id="saveActivityChange" style="margin-top:16px">保存并提醒 23 位参与者</button>
                 <p class="edit-save-note">保存即计为第 3 次修改，并同步更新活动详情。</p>
@@ -1066,13 +1066,36 @@
     // 路书页停用期间不注册离线下载和轨迹跟随事件。
     document.getElementById('nextPublish').addEventListener('click', () => showToast('草稿已保存 · 进入第 2 步'));
     const changeSummary = document.getElementById('changeSummary');
-    changeSummary.addEventListener('input', () => {
-      const summary = changeSummary.value.trim();
+    const changeOriginal = {
+      changeTitle: '妙峰山晨骑挑战', changeDate: '2026-08-08', changeTime: '06:30',
+      changeMeeting: '苹果园地铁站 A 口', changeSpeed: '24–28 km/h', changeCapacity: '30',
+      changeDescription: '全程不拉爆，山脚按能力分组。妙峰山顶统一合影，返程在担礼村补给。'
+    };
+    const updatePrototypeChangeSummary = () => {
+      const details = [];
+      const addIfChanged = (id, label, format) => {
+        const value = document.getElementById(id).value.trim();
+        if (value !== changeOriginal[id]) details.push(format(value));
+      };
+      addIfChanged('changeTitle', '活动名称', value => `活动名称改为「${value}」`);
+      if (document.getElementById('changeDate').value !== changeOriginal.changeDate || document.getElementById('changeTime').value !== changeOriginal.changeTime) details.push(`出发时间改为 ${document.getElementById('changeDate').value} ${document.getElementById('changeTime').value}`);
+      addIfChanged('changeMeeting', '集合地点', value => `集合地点改为「${value}」`);
+      addIfChanged('changeSpeed', '巡航速度', value => `巡航速度改为 ${value}`);
+      addIfChanged('changeCapacity', '人数上限', value => `人数上限改为 ${value} 人`);
+      addIfChanged('changeDescription', '活动说明', () => '活动说明已更新');
+      const full = details.join('；');
+      changeSummary.value = full.length <= 80 ? full : `已调整：${details.map(item => item.split('改为')[0].replace('已更新', '')).join('、')}`.slice(0, 80);
       document.getElementById('summaryCount').textContent = changeSummary.value.length;
-      document.getElementById('changePreviewText').textContent = summary || '请填写简洁的变更摘要';
+      document.getElementById('changePreviewText').textContent = changeSummary.value || '修改活动信息后自动生成提醒';
+    };
+    ['changeTitle', 'changeDate', 'changeTime', 'changeMeeting', 'changeSpeed', 'changeCapacity', 'changeDescription'].forEach(id => {
+      const element = document.getElementById(id);
+      element.addEventListener('input', updatePrototypeChangeSummary);
+      element.addEventListener('change', updatePrototypeChangeSummary);
     });
+    updatePrototypeChangeSummary();
     document.getElementById('saveActivityChange').addEventListener('click', () => {
-      if (!changeSummary.value.trim()) return showToast('请填写变更摘要');
+      if (!changeSummary.value.trim()) return showToast('活动信息没有发生变化');
       document.getElementById('changeEditor').hidden = true;
       document.getElementById('changeComplete').classList.add('show');
       mainScroll.scrollTop = 0;

@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.buildAutomaticChangeSummary = buildAutomaticChangeSummary;
 const api_1 = require("../../services/api");
 const domain_1 = require("../../utils/domain");
 const presentation_1 = require("../../utils/presentation");
@@ -11,6 +12,72 @@ function comparableForm(form) {
         return '';
     const { coverFilePath, ...persisted } = form;
     return JSON.stringify(persisted);
+}
+function sameValue(left, right) {
+    return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+function limitedSummary(details, labels) {
+    const detailSummary = details.join('；');
+    if (Array.from(detailSummary).length <= CHANGE_SUMMARY_LIMIT)
+        return detailSummary;
+    const uniqueLabels = [...new Set(labels)];
+    const labelSummary = `已调整：${uniqueLabels.join('、')}`;
+    if (Array.from(labelSummary).length <= CHANGE_SUMMARY_LIMIT)
+        return labelSummary;
+    const selected = [];
+    for (const label of uniqueLabels) {
+        const candidate = `已调整：${[...selected, label].join('、')}等${uniqueLabels.length}项`;
+        if (Array.from(candidate).length > CHANGE_SUMMARY_LIMIT)
+            break;
+        selected.push(label);
+    }
+    return `已调整：${selected.join('、')}等${uniqueLabels.length}项`;
+}
+function buildAutomaticChangeSummary(originalSerialized, current, routes) {
+    if (!originalSerialized || !current)
+        return { summary: '', labels: [] };
+    const original = JSON.parse(originalSerialized);
+    const details = [];
+    const labels = [];
+    const add = (label, detail) => { labels.push(label); details.push(detail); };
+    const routeChanged = !sameValue(original.routeId || '', current.routeId || '');
+    if (original.title.trim() !== current.title.trim())
+        add('活动名称', `活动名称改为「${current.title.trim()}」`);
+    if (original.date !== current.date || original.time !== current.time)
+        add('出发时间', `出发时间改为 ${current.date} ${current.time}`);
+    if (original.meetingPoint.trim() !== current.meetingPoint.trim())
+        add('集合地点', `集合地点改为「${current.meetingPoint.trim()}」`);
+    else if (!sameValue(original.meetingLatitude, current.meetingLatitude) || !sameValue(original.meetingLongitude, current.meetingLongitude))
+        add('集合点定位', '集合点定位已更新');
+    if (routeChanged) {
+        const routeName = routes.find((route) => route.id === current.routeId)?.name;
+        add('活动路书', current.routeId ? `活动路书改为「${routeName || '新路书'}」` : '已取消关联活动路书');
+    }
+    if (!routeChanged && !sameValue(original.distanceKm, current.distanceKm))
+        add('活动距离', `活动距离改为 ${current.distanceKm || 0} km`);
+    if (!routeChanged && !sameValue(original.elevationGainM, current.elevationGainM))
+        add('累计爬升', `累计爬升改为 ${current.elevationGainM || 0} m`);
+    if (!routeChanged && original.difficulty !== current.difficulty)
+        add('活动难度', `活动难度改为${current.difficulty}`);
+    if (!sameValue(original.capacity, current.capacity))
+        add('人数上限', `人数上限改为 ${current.capacity} 人`);
+    if (original.speedRange.trim() !== current.speedRange.trim())
+        add('巡航速度', `巡航速度改为 ${current.speedRange.trim()}`);
+    if (original.description.trim() !== current.description.trim())
+        add('活动说明', '活动说明已更新');
+    if (!sameValue(original.requirements.equipment, current.requirements.equipment))
+        add('必备装备', '必备装备已更新');
+    if (!sameValue(original.requirements.bikeTypes, current.requirements.bikeTypes))
+        add('允许车型', '允许车型已更新');
+    if (!sameValue(original.requirements.disciplines, current.requirements.disciplines))
+        add('骑行纪律', '骑行纪律已更新');
+    if (!sameValue(original.requirements.recentDistanceKm, current.requirements.recentDistanceKm) || !sameValue(original.requirements.recentElevationM, current.requirements.recentElevationM))
+        add('能力要求', '近期骑行能力要求已更新');
+    if ((original.requirements.customNote || '').trim() !== (current.requirements.customNote || '').trim())
+        add('补充要求', '补充要求已更新');
+    if (current.coverFilePath)
+        add('活动封面', '活动封面已更新');
+    return { summary: limitedSummary(details, labels), labels };
 }
 function dateParts(value) {
     const date = new Date(value);
@@ -73,7 +140,7 @@ Page({
                 event, routes, routeOptions: [{ name: '不选择路书', route: null }, ...routes.map((route) => ({ name: route.name, route }))],
                 selectedRoute, routeIndex: routeIndex + 1, difficultyIndex: Math.max(0, this.data.difficultyOptions.indexOf(event.route.difficulty)),
                 changeCount, changeLimit, changesRemaining, isLastChange: changesRemaining === 1, changeLocked: changesRemaining === 0,
-                coverPreview: event.coverUrl || '', form, originalForm: comparableForm(form),
+                coverPreview: event.coverUrl || '', form, originalForm: comparableForm(form), changeSummary: '', summaryLength: 0,
                 equipmentOptions: optionState(['骑行头盔', '前后车灯', '补胎工具', '备用内胎', '锁鞋', '对讲设备'], event.requirements.equipment),
                 bikeOptions: optionState(['公路车', '砾石车', '山地车', '铁三车'], event.requirements.bikeTypes),
                 disciplineOptions: optionState(['听从领队指挥', '保持安全车距', '下坡禁止超车', '掉队原地等收队'], event.requirements.disciplines),
@@ -86,25 +153,28 @@ Page({
     },
     onField(event) {
         const field = String(event.currentTarget.dataset.field || '');
-        this.setData({ [`form.${field}`]: event.detail.value });
-        if (field === 'meetingPoint')
-            this.setData({ 'form.meetingLatitude': undefined, 'form.meetingLongitude': undefined });
+        const update = { [`form.${field}`]: event.detail.value };
+        if (field === 'meetingPoint') {
+            update['form.meetingLatitude'] = undefined;
+            update['form.meetingLongitude'] = undefined;
+        }
+        this.setData(update, () => this.updateAutomaticSummary());
     },
-    onNumber(event) { this.setData({ [`form.${event.currentTarget.dataset.field}`]: Number(event.detail.value) }); },
-    onDate(event) { this.setData({ 'form.date': event.detail.value }); },
-    onTime(event) { this.setData({ 'form.time': event.detail.value }); },
+    onNumber(event) { this.setData({ [`form.${event.currentTarget.dataset.field}`]: Number(event.detail.value) }, () => this.updateAutomaticSummary()); },
+    onDate(event) { this.setData({ 'form.date': event.detail.value }, () => this.updateAutomaticSummary()); },
+    onTime(event) { this.setData({ 'form.time': event.detail.value }, () => this.updateAutomaticSummary()); },
     onRoute(event) {
         const routeIndex = Number(event.detail.value);
         const selectedRoute = this.data.routeOptions[routeIndex]?.route || null;
-        this.setData({ routeIndex, selectedRoute, 'form.routeId': selectedRoute?.id || '', 'form.distanceKm': selectedRoute?.distanceKm || 0, 'form.elevationGainM': selectedRoute?.elevationGainM || 0, 'form.difficulty': selectedRoute?.difficulty || '中等', difficultyIndex: selectedRoute ? Math.max(0, this.data.difficultyOptions.indexOf(selectedRoute.difficulty)) : 1 });
+        this.setData({ routeIndex, selectedRoute, 'form.routeId': selectedRoute?.id || '', 'form.distanceKm': selectedRoute?.distanceKm || 0, 'form.elevationGainM': selectedRoute?.elevationGainM || 0, 'form.difficulty': selectedRoute?.difficulty || '中等', difficultyIndex: selectedRoute ? Math.max(0, this.data.difficultyOptions.indexOf(selectedRoute.difficulty)) : 1 }, () => this.updateAutomaticSummary());
     },
     onDifficulty(event) {
         const difficultyIndex = Number(event.detail.value);
-        this.setData({ difficultyIndex, 'form.difficulty': this.data.difficultyOptions[difficultyIndex] });
+        this.setData({ difficultyIndex, 'form.difficulty': this.data.difficultyOptions[difficultyIndex] }, () => this.updateAutomaticSummary());
     },
-    onSummary(event) {
-        const changeSummary = String(event.detail.value || '');
-        this.setData({ changeSummary, summaryLength: Array.from(changeSummary).length });
+    updateAutomaticSummary() {
+        const result = buildAutomaticChangeSummary(this.data.originalForm, this.data.form, this.data.routes);
+        this.setData({ changeSummary: result.summary, summaryLength: Array.from(result.summary).length });
     },
     chooseMeetingPointOnMap() {
         wx.chooseLocation({
@@ -114,7 +184,7 @@ Page({
                     return;
                 const recent = (wx.getStorageSync(RECENT_MEETING_POINTS_KEY) || []);
                 wx.setStorageSync(RECENT_MEETING_POINTS_KEY, [label, ...recent.filter((item) => item !== label)].slice(0, 8));
-                this.setData({ 'form.meetingPoint': label, 'form.meetingLatitude': result.latitude, 'form.meetingLongitude': result.longitude });
+                this.setData({ 'form.meetingPoint': label, 'form.meetingLatitude': result.latitude, 'form.meetingLongitude': result.longitude }, () => this.updateAutomaticSummary());
             },
             fail: () => undefined,
         });
@@ -125,7 +195,7 @@ Page({
         wx.chooseImage({ count: 1, sizeType: ['compressed'], sourceType: ['album', 'camera'], success: (result) => {
                 const filePath = result.tempFilePaths[0];
                 if (filePath)
-                    this.setData({ coverPreview: filePath, 'form.coverFilePath': filePath });
+                    this.setData({ coverPreview: filePath, 'form.coverFilePath': filePath }, () => this.updateAutomaticSummary());
             }, fail: () => undefined });
     },
     toggleOption(event) {
@@ -140,7 +210,7 @@ Page({
             'form.requirements.equipment': this.data.equipmentOptions.filter((item) => item.selected).map((item) => item.label),
             'form.requirements.bikeTypes': this.data.bikeOptions.filter((item) => item.selected).map((item) => item.label),
             'form.requirements.disciplines': this.data.disciplineOptions.filter((item) => item.selected).map((item) => item.label),
-        });
+        }, () => this.updateAutomaticSummary());
     },
     onKeyboardOpen() {
         if (keyboardCloseTimer)

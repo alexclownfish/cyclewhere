@@ -36,9 +36,9 @@
     </view>
 
     <view wx:if="{{!changeLocked}}" class="change-section">
-      <view class="change-head"><view><view class="section-title">本次变更提醒</view><view class="change-tip">将醒目展示给所有活动参与者</view></view><text class="counter {{summaryLength >= summaryLimit ? 'counter-limit' : ''}}">{{summaryLength}} / {{summaryLimit}}</text></view>
-      <textarea class="summary-input" maxlength="80" placeholder="简洁说明重要变化，例如：集合时间改为 07:00，地点调整至北门" value="{{changeSummary}}" bindinput="onSummary" bindfocus="onKeyboardOpen" bindblur="onKeyboardClose" />
-      <view class="preview"><view class="preview-label">参与者看到的提醒</view><view class="preview-title">重要变更 · 第 {{changeCount + 1}} 次修改</view><view class="preview-copy">{{changeSummary || '填写摘要后可在这里预览提醒内容'}}</view></view>
+      <view class="change-head"><view><view class="section-title">本次变更提醒</view><view class="change-tip">系统根据修改内容自动生成，将展示给所有参与者</view></view><text class="counter {{summaryLength >= summaryLimit ? 'counter-limit' : ''}}">{{summaryLength}} / {{summaryLimit}}</text></view>
+      <textarea class="summary-input auto-summary" disabled="{{true}}" maxlength="80" placeholder="修改活动信息后将自动生成提醒" value="{{changeSummary}}" />
+      <view class="preview"><view class="preview-label">参与者看到的提醒</view><view class="preview-title">重要变更 · 第 {{changeCount + 1}} 次修改</view><view class="preview-copy">{{changeSummary || '修改活动信息后可在这里预览提醒内容'}}</view></view>
     </view>
     <view wx:if="{{!keyboardOpen}}" class="sticky-actions"><button class="button button-primary" loading="{{submitting}}" disabled="{{submitting || changeLocked}}" bindtap="submit">{{changeLocked ? '修改次数已用完' : '保存并提醒参与者'}}</button></view>
   </block>
