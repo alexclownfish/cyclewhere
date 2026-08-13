@@ -246,12 +246,17 @@ function createRealApi(transport, currentUser, authHeaders) {
             return (0, api_contract_1.mapEvent)(published, route, currentUserId());
         },
         async updateEvent(id, input) {
-            const route = input.routeId
-                ? (0, api_contract_1.mapRoadbook)(await transport({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' }))
-                : undefined;
-            let updated = await protectedRequest({ url: `/api/v1/events/${id}`, method: 'PUT', data: (0, api_contract_1.toCreateEvent)(input, route) });
-            if (input.coverFilePath)
-                updated = await uploadEventCover(id, input.coverFilePath, await authHeaders());
+            const [current, route] = await Promise.all([
+                transport({ url: `/api/v1/events/${id}`, method: 'GET' }),
+                input.routeId
+                    ? transport({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' }).then(api_contract_1.mapRoadbook)
+                    : Promise.resolve(undefined),
+            ]);
+            const stagedCover = input.coverFilePath
+                ? await uploadEventCover(id, input.coverFilePath, await authHeaders(), true)
+                : null;
+            const updateInput = stagedCover ? { ...input, coverUrl: stagedCover.coverUrl } : input;
+            const updated = await protectedRequest({ url: `/api/v1/events/${id}`, method: 'PUT', data: (0, api_contract_1.toUpdateEvent)(updateInput, route, current) });
             return (0, api_contract_1.mapEvent)(updated, route, currentUserId());
         },
         async getProfile() {
@@ -339,9 +344,9 @@ function uploadAvatarBase64(filePath, headers) {
         fail: (error) => reject(new ApiError(`头像上传失败：${error.errMsg}`, 0, 'AVATAR_UPLOAD_FAILED')),
     })));
 }
-function uploadEventCover(eventId, filePath, headers) {
+function uploadEventCover(eventId, filePath, headers, stageOnly = false) {
     return readFileAsBase64(filePath).then((data) => new Promise((resolve, reject) => wx.request({
-        url: `${env_1.API_BASE_URL}/api/v1/events/${eventId}/cover/base64`, method: 'POST', data: { data },
+        url: `${env_1.API_BASE_URL}/api/v1/events/${eventId}/cover/base64${stageOnly ? '?stage=1' : ''}`, method: 'POST', data: { data },
         header: { 'content-type': 'application/json', ...headers },
         success(response) {
             try {

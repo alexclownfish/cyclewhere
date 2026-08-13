@@ -5,6 +5,7 @@ exports.fallbackRoute = fallbackRoute;
 exports.mapEvent = mapEvent;
 exports.mapRegistration = mapRegistration;
 exports.toCreateEvent = toCreateEvent;
+exports.toUpdateEvent = toUpdateEvent;
 const coordinates_1 = require("../utils/coordinates");
 const difficultyToClient = {
     easy: '轻松', moderate: '中等', challenging: '进阶', expert: '进阶',
@@ -77,6 +78,9 @@ function mapEvent(event, route, currentUserId) {
             disciplines: parsedRequirements.disciplines, customNote: parsedRequirements.customNote,
         },
         ownedByMe: event.ownedByMe ?? (Boolean(currentUserId) && event.organizerId === currentUserId),
+        changeCount: event.changeCount ?? 0,
+        changeLimit: event.changeLimit ?? 3,
+        latestChange: event.latestChange || null,
     };
 }
 function mapRegistration(item) {
@@ -107,5 +111,16 @@ function toCreateEvent(input, route) {
         elevationGainM: route?.elevationGainM ?? input.elevationGainM ?? 0,
         speedMinKph: speeds[0] || 20, speedMaxKph: speeds[1] || speeds[0] || 25, capacity: input.capacity,
         equipmentRequirements: input.requirements.equipment, abilityRequirements, safetyNotice: input.description.trim(),
+    };
+}
+function toUpdateEvent(input, route, current) {
+    const payload = toCreateEvent(input, route);
+    const startChanged = payload.startAt !== current.startAt;
+    return {
+        ...payload,
+        registrationDeadline: startChanged ? payload.registrationDeadline : current.registrationDeadline,
+        safetyNotice: current.safetyNotice,
+        changeSummary: input.changeSummary.trim(),
+        ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl } : {}),
     };
 }

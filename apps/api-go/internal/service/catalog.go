@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -44,10 +47,11 @@ type EventInput struct {
 }
 
 type EventPatch struct {
+	ChangeSummary         string             `json:"changeSummary"`
 	RouteID               **string           `json:"routeId"`
 	Title                 *string            `json:"title"`
 	Summary               *string            `json:"summary"`
-	CoverURL              **string           `json:"-"`
+	CoverURL              **string           `json:"coverUrl"`
 	StartAt               *time.Time         `json:"startAt"`
 	RegistrationDeadline  *time.Time         `json:"registrationDeadline"`
 	MeetingPoint          *string            `json:"meetingPoint"`
@@ -195,9 +199,7 @@ func (s *Catalog) UpdateEvent(ctx context.Context, id, organizerID string, patch
 	if event.Status == domain.EventCompleted || event.Status == domain.EventCancelled {
 		return domain.Event{}, domain.InvalidState("已结束或已取消的活动不可编辑")
 	}
-	if event.RegistrationCount > 0 && restrictedChange(*event, patch) {
-		return domain.Event{}, domain.InvalidState("已有报名后不可修改路线、出发时间、报名截止时间或人数上限")
-	}
+	before := *event
 	applyEventPatch(event, patch)
 	if event.Capacity < event.RegistrationCount {
 		return domain.Event{}, domain.InvalidState("人数上限不能低于已报名人数")
@@ -214,8 +216,26 @@ func (s *Catalog) UpdateEvent(ctx context.Context, id, organizerID string, patch
 			return domain.Event{}, domain.NotFound("路书")
 		}
 	}
+	changedFields := eventChangedFields(before, *event)
+	if len(changedFields) == 0 {
+		return domain.Event{}, domain.Conflict("EVENT_NO_CHANGES", "活动信息没有发生变化")
+	}
 	event.UpdatedAt = s.clock().UTC()
 	event.Version++
+	if event.Status == domain.EventPublished || event.Status == domain.EventFull {
+		changeSummary := strings.TrimSpace(patch.ChangeSummary)
+		if length := len([]rune(changeSummary)); length < 1 || length > 80 {
+			return domain.Event{}, eventChangeValidation("changeSummary", "变更摘要长度应为 1 至 80 个字符")
+		}
+		if event.ChangeCount >= domain.EventChangeLimit {
+			return domain.Event{}, domain.Conflict("EVENT_CHANGE_LIMIT_REACHED", "活动信息最多只能修改 3 次")
+		}
+		change := domain.EventChange{
+			ID: uuid.NewString(), EventID: event.ID, Summary: changeSummary,
+			ChangeNumber: event.ChangeCount + 1, ChangedFields: changedFields, CreatedAt: event.UpdatedAt,
+		}
+		return s.repository.UpdateEventWithChange(ctx, *event, change)
+	}
 	return s.repository.UpdateEvent(ctx, *event)
 }
 
@@ -337,24 +357,73 @@ func applyEventPatch(event *domain.Event, patch EventPatch) {
 	}
 }
 
-func restrictedChange(event domain.Event, patch EventPatch) bool {
-	if patch.RouteID != nil && !sameStringPointer(event.RouteID, *patch.RouteID) {
-		return true
+func eventChangedFields(before, after domain.Event) []domain.EventChangedField {
+	fields := make([]domain.EventChangedField, 0, 18)
+	appendChange := func(field string, oldValue, newValue any) {
+		if reflect.DeepEqual(oldValue, newValue) {
+			return
+		}
+		fields = append(fields, domain.EventChangedField{
+			Field: field, Before: eventChangeValue(oldValue), After: eventChangeValue(newValue),
+		})
 	}
-	if patch.StartAt != nil && !patch.StartAt.Equal(event.StartAt) {
-		return true
+	if !reflect.DeepEqual(before.RouteID, after.RouteID) {
+		fields = append(fields, domain.EventChangedField{Field: "route", Before: "原活动路书", After: "活动路书已调整"})
 	}
-	if patch.RegistrationDeadline != nil && !patch.RegistrationDeadline.Equal(event.RegistrationDeadline) {
-		return true
+	appendChange("title", before.Title, after.Title)
+	appendChange("summary", before.Summary, after.Summary)
+	if !reflect.DeepEqual(before.CoverURL, after.CoverURL) {
+		fields = append(fields, domain.EventChangedField{Field: "cover", Before: "原活动封面", After: "活动封面已更新"})
 	}
-	return patch.Capacity != nil && *patch.Capacity != event.Capacity
+	appendChange("startAt", before.StartAt, after.StartAt)
+	appendChange("registrationDeadline", before.RegistrationDeadline, after.RegistrationDeadline)
+	appendChange("meetingPoint", before.MeetingPoint, after.MeetingPoint)
+	if before.MeetingPoint == after.MeetingPoint &&
+		(!reflect.DeepEqual(before.MeetingLatitude, after.MeetingLatitude) || !reflect.DeepEqual(before.MeetingLongitude, after.MeetingLongitude)) {
+		fields = append(fields, domain.EventChangedField{Field: "meetingPoint", Before: "原集合点定位", After: "集合点定位已更新"})
+	}
+	appendChange("difficulty", before.Difficulty, after.Difficulty)
+	appendChange("distanceKm", before.DistanceKM, after.DistanceKM)
+	appendChange("elevationGainM", before.ElevationGainM, after.ElevationGainM)
+	appendChange("speedMinKph", before.SpeedMinKPH, after.SpeedMinKPH)
+	appendChange("speedMaxKph", before.SpeedMaxKPH, after.SpeedMaxKPH)
+	appendChange("capacity", before.Capacity, after.Capacity)
+	appendChange("equipmentRequirements", before.EquipmentRequirements, after.EquipmentRequirements)
+	appendChange("abilityRequirements", before.AbilityRequirements, after.AbilityRequirements)
+	appendChange("safetyNotice", before.SafetyNotice, after.SafetyNotice)
+	return fields
 }
 
-func sameStringPointer(left, right *string) bool {
-	if left == nil || right == nil {
-		return left == nil && right == nil
+func eventChangeValue(value any) string {
+	switch typed := value.(type) {
+	case time.Time:
+		return typed.UTC().Format(time.RFC3339)
+	case *string:
+		if typed == nil {
+			return ""
+		}
+		return *typed
+	case *float64:
+		if typed == nil {
+			return ""
+		}
+		return fmt.Sprint(*typed)
+	case string:
+		return typed
+	case domain.Difficulty:
+		return string(typed)
 	}
-	return *left == *right
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprint(value)
+	}
+	return string(encoded)
+}
+
+func eventChangeValidation(field, message string) *domain.Error {
+	err := domain.NewError("VALIDATION_ERROR", "活动变更信息不完整", 422)
+	err.Details = map[string]string{"field": field, "message": message}
+	return err
 }
 
 func validateEventInput(input EventInput) error {

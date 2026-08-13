@@ -1,0 +1,45 @@
+<view class="page edit-page">
+  <view wx:if="{{loading}}" class="loading"><text class="loading-dot"></text>正在加载活动信息</view>
+  <view wx:elif="{{loadError}}" class="empty-state"><text class="empty-icon">!</text><view class="empty-title">活动暂时无法修改</view><view class="empty-copy">{{loadError}}</view><button class="button button-plain" bindtap="loadPage">重新加载</button></view>
+  <block wx:elif="{{form}}">
+    <view class="edit-head">
+      <view class="head-kicker">UPDATE RIDE</view><view class="head-title">修改活动</view>
+      <view class="head-copy">修改后将提醒所有已报名骑友关注最新安排。</view>
+      <view class="quota-row"><view class="quota-dots"><text wx:for="{{changeLimit}}" wx:key="index" class="quota-dot {{index < changeCount ? 'quota-used' : ''}}"></text></view><text class="quota-copy">已修改 {{changeCount}} / {{changeLimit}} 次</text></view>
+    </view>
+    <view wx:if="{{changeLocked}}" class="limit-banner limit-locked"><view class="limit-icon">!</view><view><view class="limit-title">修改次数已用完</view><view class="limit-copy">该活动已完成 3 次修改，当前信息不可再次编辑。</view></view></view>
+    <view wx:elif="{{isLastChange}}" class="limit-banner"><view class="limit-icon">!</view><view><view class="limit-title">这是最后一次修改机会</view><view class="limit-copy">保存后将达到 {{changeLimit}} / {{changeLimit}} 次，请完整核对活动安排。</view></view></view>
+
+    <view class="form-section">
+      <view class="section-title">路书与基础信息</view>
+      <view class="field"><label class="label">活动路书 <text class="optional-label">选填</text></label><picker disabled="{{changeLocked}}" range="{{routeOptions}}" range-key="name" value="{{routeIndex}}" bindchange="onRoute"><view class="route-picker {{selectedRoute ? '' : 'route-picker-empty'}}"><image wx:if="{{selectedRoute}}" src="{{selectedRoute.cover}}" mode="aspectFill" /><view wx:else class="route-empty-icon">⌁</view><view class="route-picker-copy"><view class="route-name">{{selectedRoute ? selectedRoute.name : '不选择路书'}}</view><view class="small">{{selectedRoute ? (selectedRoute.distanceKm + ' km · 爬升 ' + selectedRoute.elevationGainM + ' m') : '使用手动填写的距离与爬升'}}</view></view><view class="chevron">›</view></view></picker></view>
+      <view wx:if="{{!selectedRoute}}" class="field-row"><view class="field"><label class="label required">预计距离</label><view class="unit-input"><input disabled="{{changeLocked}}" type="digit" value="{{form.distanceKm || ''}}" data-field="distanceKm" bindinput="onNumber" /><text>km</text></view></view><view class="field"><label class="label">预计爬升</label><view class="unit-input"><input disabled="{{changeLocked}}" type="number" value="{{form.elevationGainM || ''}}" data-field="elevationGainM" bindinput="onNumber" /><text>m</text></view></view></view>
+      <view class="field"><label class="label required">活动名称</label><input disabled="{{changeLocked}}" class="input" maxlength="30" value="{{form.title}}" data-field="title" bindinput="onField" bindfocus="onKeyboardOpen" bindblur="onKeyboardClose" /></view>
+      <view class="field"><label class="label">活动封面</label><view class="cover-picker" bindtap="chooseCover"><image wx:if="{{coverPreview}}" src="{{coverPreview}}" mode="aspectFill" /><view wx:else class="cover-placeholder"><view class="cover-plus">+</view><text>添加活动封面</text></view><view wx:if="{{coverPreview && !changeLocked}}" class="cover-edit">更换封面</view></view></view>
+      <view class="field-row"><view class="field"><label class="label required">出发日期</label><picker disabled="{{changeLocked}}" mode="date" value="{{form.date}}" bindchange="onDate"><view class="picker">{{form.date}}<text class="picker-icon">⌄</text></view></picker></view><view class="field"><label class="label required">集合时间</label><picker disabled="{{changeLocked}}" mode="time" value="{{form.time}}" bindchange="onTime"><view class="picker">{{form.time}}<text class="picker-icon">⌄</text></view></picker></view></view>
+      <view class="field"><label class="label required">集合地点</label><view class="location-input-row"><input disabled="{{changeLocked}}" class="input location-input" maxlength="50" value="{{form.meetingPoint}}" data-field="meetingPoint" bindinput="onField" bindfocus="onKeyboardOpen" bindblur="onKeyboardClose" /><button disabled="{{changeLocked}}" class="map-location-button" bindtap="chooseMeetingPointOnMap">地图选点</button></view></view>
+    </view>
+
+    <view class="form-section">
+      <view class="section-title">队伍设置与活动说明</view>
+      <view class="field-row"><view class="field"><label class="label required">人数上限</label><input disabled="{{changeLocked}}" class="input" type="number" value="{{form.capacity}}" data-field="capacity" bindinput="onNumber" /></view><view class="field"><label class="label required">巡航速度</label><input disabled="{{changeLocked}}" class="input" value="{{form.speedRange}}" data-field="speedRange" bindinput="onField" /></view></view>
+      <view class="field"><label class="label">活动说明</label><textarea disabled="{{changeLocked}}" class="textarea" maxlength="300" value="{{form.description}}" data-field="description" bindinput="onField" /></view>
+    </view>
+
+    <view class="form-section">
+      <view class="section-title">装备与能力要求</view>
+      <view class="field"><label class="label required">必备装备</label><view class="option-grid"><view wx:for="{{equipmentOptions}}" wx:key="label" class="option {{item.selected ? 'option-selected' : ''}}" data-group="equipmentOptions" data-index="{{index}}" bindtap="toggleOption"><view class="check-box">{{item.selected ? '✓' : ''}}</view><text>{{item.label}}</text></view></view></view>
+      <view class="field-row"><view class="field"><label class="label">近 30 天单次距离</label><view class="unit-input"><input disabled="{{changeLocked}}" type="number" value="{{form.requirements.recentDistanceKm}}" data-field="requirements.recentDistanceKm" bindinput="onNumber" /><text>km</text></view></view><view class="field"><label class="label">近 30 天累计爬升</label><view class="unit-input"><input disabled="{{changeLocked}}" type="number" value="{{form.requirements.recentElevationM}}" data-field="requirements.recentElevationM" bindinput="onNumber" /><text>m</text></view></view></view>
+      <view class="field"><label class="label required">允许车型</label><view class="option-grid"><view wx:for="{{bikeOptions}}" wx:key="label" class="option {{item.selected ? 'option-selected' : ''}}" data-group="bikeOptions" data-index="{{index}}" bindtap="toggleOption"><view class="check-box">{{item.selected ? '✓' : ''}}</view><text>{{item.label}}</text></view></view></view>
+      <view class="field"><label class="label required">骑行纪律</label><view class="option-grid"><view wx:for="{{disciplineOptions}}" wx:key="label" class="option discipline {{item.selected ? 'option-selected' : ''}}" data-group="disciplineOptions" data-index="{{index}}" bindtap="toggleOption"><view class="check-box">{{item.selected ? '✓' : ''}}</view><text>{{item.label}}</text></view></view></view>
+      <view class="field"><label class="label">补充要求</label><textarea disabled="{{changeLocked}}" class="textarea" maxlength="200" value="{{form.requirements.customNote}}" data-field="requirements.customNote" bindinput="onField" /></view>
+    </view>
+
+    <view wx:if="{{!changeLocked}}" class="change-section">
+      <view class="change-head"><view><view class="section-title">本次变更提醒</view><view class="change-tip">将醒目展示给所有活动参与者</view></view><text class="counter {{summaryLength >= summaryLimit ? 'counter-limit' : ''}}">{{summaryLength}} / {{summaryLimit}}</text></view>
+      <textarea class="summary-input" maxlength="80" placeholder="简洁说明重要变化，例如：集合时间改为 07:00，地点调整至北门" value="{{changeSummary}}" bindinput="onSummary" bindfocus="onKeyboardOpen" bindblur="onKeyboardClose" />
+      <view class="preview"><view class="preview-label">参与者看到的提醒</view><view class="preview-title">重要变更 · 第 {{changeCount + 1}} 次修改</view><view class="preview-copy">{{changeSummary || '填写摘要后可在这里预览提醒内容'}}</view></view>
+    </view>
+    <view wx:if="{{!keyboardOpen}}" class="sticky-actions"><button class="button button-primary" loading="{{submitting}}" disabled="{{submitting || changeLocked}}" bindtap="submit">{{changeLocked ? '修改次数已用完' : '保存并提醒参与者'}}</button></view>
+  </block>
+</view>

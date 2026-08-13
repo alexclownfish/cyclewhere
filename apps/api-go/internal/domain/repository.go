@@ -32,7 +32,9 @@ type Repository interface {
 	BindUserPhone(context.Context, string, string, string, string, time.Time) error
 	CreateEvent(context.Context, Event) (Event, error)
 	UpdateEvent(context.Context, Event) (Event, error)
+	UpdateEventWithChange(context.Context, Event, EventChange) (Event, error)
 	GetEvent(context.Context, string) (*Event, error)
+	ListEventChanges(context.Context, string) ([]EventChange, error)
 	ListEvents(context.Context, EventListQuery) (Page[Event], error)
 	ListEventsByOrganizer(context.Context, string) ([]Event, error)
 	CreateRoadbook(context.Context, Roadbook) (Roadbook, error)

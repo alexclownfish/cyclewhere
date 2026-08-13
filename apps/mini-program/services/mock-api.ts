@@ -1,4 +1,4 @@
-import type { EventParticipant, EventParticipantContact, MyRegistrationRecord, PublishEventInput, Registration, RegistrationInput, RideEvent, RideRoute, UserProfile } from '../types/domain';
+import type { EventParticipant, EventParticipantContact, MyRegistrationRecord, PublishEventInput, Registration, RegistrationInput, RideEvent, RideRoute, UpdateEventInput, UserProfile } from '../types/domain';
 import { canRegister } from '../utils/domain';
 import { events as seedEvents, initialRegistrations, routes } from './mock-data';
 
@@ -117,12 +117,15 @@ export const mockApi = {
     saveEvents(allEvents);
     return delay(event);
   },
-  async updateEvent(id: string, input: PublishEventInput): Promise<RideEvent> {
+  async updateEvent(id: string, input: UpdateEventInput): Promise<RideEvent> {
     const allEvents = loadEvents();
     const event = allEvents.find((item) => item.id === id);
     if (!event) throw new Error('娲诲姩涓嶅瓨鍦');
     const route = routes.find((item) => item.id === input.routeId) || routes[1];
-    Object.assign(event, { title: input.title, startAt: `${input.date}T${input.time}:00+08:00`, meetingPoint: input.meetingPoint, routeId: route.id, route, capacity: input.capacity, speedRange: input.speedRange, description: input.description, requirements: input.requirements });
+    const changeCount = event.changeCount || 0;
+    const changeLimit = event.changeLimit || 3;
+    if (changeCount >= changeLimit) throw new Error('该活动的修改次数已用完');
+    Object.assign(event, { title: input.title, startAt: `${input.date}T${input.time}:00+08:00`, meetingPoint: input.meetingPoint, routeId: route.id, route, capacity: input.capacity, speedRange: input.speedRange, description: input.description, requirements: input.requirements, changeCount: changeCount + 1, changeLimit, latestChange: { summary: input.changeSummary.trim(), changeNumber: changeCount + 1, createdAt: new Date().toISOString() } });
     saveEvents(allEvents);
     return delay(event);
   },

@@ -22,31 +22,50 @@ const (
 )
 
 type Event struct {
-	ID                    string      `json:"id"`
-	OrganizerID           string      `json:"organizerId"`
-	RouteID               *string     `json:"routeId"`
-	Title                 string      `json:"title"`
-	Summary               string      `json:"summary"`
-	CoverURL              *string     `json:"coverUrl"`
-	StartAt               time.Time   `json:"startAt"`
-	RegistrationDeadline  time.Time   `json:"registrationDeadline"`
-	MeetingPoint          string      `json:"meetingPoint"`
-	MeetingLatitude       *float64    `json:"meetingLatitude"`
-	MeetingLongitude      *float64    `json:"meetingLongitude"`
-	Difficulty            Difficulty  `json:"difficulty"`
-	DistanceKM            float64     `json:"distanceKm"`
-	ElevationGainM        int         `json:"elevationGainM"`
-	SpeedMinKPH           float64     `json:"speedMinKph"`
-	SpeedMaxKPH           float64     `json:"speedMaxKph"`
-	Capacity              int         `json:"capacity"`
-	RegistrationCount     int         `json:"registrationCount"`
-	EquipmentRequirements []string    `json:"equipmentRequirements"`
-	AbilityRequirements   []string    `json:"abilityRequirements"`
-	SafetyNotice          string      `json:"safetyNotice"`
-	Status                EventStatus `json:"status"`
-	CreatedAt             time.Time   `json:"createdAt"`
-	UpdatedAt             time.Time   `json:"updatedAt"`
-	Version               int         `json:"version"`
+	ID                    string       `json:"id"`
+	OrganizerID           string       `json:"organizerId"`
+	RouteID               *string      `json:"routeId"`
+	Title                 string       `json:"title"`
+	Summary               string       `json:"summary"`
+	CoverURL              *string      `json:"coverUrl"`
+	StartAt               time.Time    `json:"startAt"`
+	RegistrationDeadline  time.Time    `json:"registrationDeadline"`
+	MeetingPoint          string       `json:"meetingPoint"`
+	MeetingLatitude       *float64     `json:"meetingLatitude"`
+	MeetingLongitude      *float64     `json:"meetingLongitude"`
+	Difficulty            Difficulty   `json:"difficulty"`
+	DistanceKM            float64      `json:"distanceKm"`
+	ElevationGainM        int          `json:"elevationGainM"`
+	SpeedMinKPH           float64      `json:"speedMinKph"`
+	SpeedMaxKPH           float64      `json:"speedMaxKph"`
+	Capacity              int          `json:"capacity"`
+	RegistrationCount     int          `json:"registrationCount"`
+	EquipmentRequirements []string     `json:"equipmentRequirements"`
+	AbilityRequirements   []string     `json:"abilityRequirements"`
+	SafetyNotice          string       `json:"safetyNotice"`
+	Status                EventStatus  `json:"status"`
+	CreatedAt             time.Time    `json:"createdAt"`
+	UpdatedAt             time.Time    `json:"updatedAt"`
+	Version               int          `json:"version"`
+	ChangeCount           int          `json:"changeCount"`
+	LatestChange          *EventChange `json:"latestChange"`
+}
+
+const EventChangeLimit = 3
+
+type EventChangedField struct {
+	Field  string `json:"field"`
+	Before string `json:"before"`
+	After  string `json:"after"`
+}
+
+type EventChange struct {
+	ID            string              `json:"id"`
+	EventID       string              `json:"eventId"`
+	Summary       string              `json:"summary"`
+	ChangeNumber  int                 `json:"changeNumber"`
+	ChangedFields []EventChangedField `json:"changedFields"`
+	CreatedAt     time.Time           `json:"createdAt"`
 }
 
 type TrackPoint struct {

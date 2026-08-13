@@ -246,6 +246,14 @@
     .status-card { margin: 14px 16px 0; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
     .status-top { display: flex; justify-content: space-between; align-items: center; }
     .status-card h3 { margin: 9px 0 6px; font-size: 16px; }
+    .profile-view { display: none; }
+    .profile-view.active { display: block; }
+    .owned-event-card { margin: 14px 16px 0; padding: 14px; border-radius: 8px; background: var(--paper); box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 8px 22px rgba(0,0,0,.045); }
+    .owned-event-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .owned-event-card h3 { margin: 9px 0 6px; font-size: 16px; }
+    .owned-event-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 13px; }
+    .owned-event-actions .text-btn { min-height: 42px; }
+    .quota-inline { color: #9a5800; font-size: 11px; font-weight: 650; }
     .menu-list { margin-top: 12px; background: var(--paper); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
     .menu-item { width: 100%; min-height: 52px; padding: 0 16px; display:flex; align-items:center; gap:11px; border:0; border-bottom:1px solid var(--line); background:var(--paper); color:var(--ink); text-align:left; }
     .menu-item:last-child { border-bottom:0; }
@@ -539,6 +547,63 @@
     }
     .sticky-action .icon-btn { border: 0; border-radius: 50%; }
 
+    .change-alert {
+      margin: 14px 16px 2px;
+      padding: 14px;
+      border: 1px solid rgba(224, 126, 0, .18);
+      border-radius: 14px;
+      background: #fff7e8;
+      box-shadow: 0 8px 24px rgba(126, 78, 0, .07);
+    }
+    .change-alert-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .change-alert-title { display: flex; align-items: center; gap: 8px; color: #8a4b00; font-size: 13px; font-weight: 750; }
+    .change-alert-title svg { width: 18px; height: 18px; stroke-width: 2.3; }
+    .change-alert-time { color: #9a6b31; font-size: 10px; }
+    .change-alert-summary { margin: 9px 0 0; color: #4b3418; font-size: 13px; font-weight: 600; line-height: 1.55; }
+    .change-alert-link { display: flex; align-items: center; gap: 3px; margin-top: 10px; padding: 0; border: 0; background: transparent; color: #9a5800; font-size: 12px; font-weight: 650; }
+    .change-alert-link svg { width: 15px; height: 15px; }
+    .change-alert-detail { margin-top: 11px; padding-top: 11px; border-top: 1px solid rgba(154, 88, 0, .15); }
+    .change-diff { display: grid; grid-template-columns: 34px 1fr; gap: 6px 8px; font-size: 11px; line-height: 1.5; }
+    .change-diff-label { color: #9a6b31; }
+    .change-diff-old { color: #8e7354; text-decoration: line-through; }
+    .change-diff-new { color: #4b3418; font-weight: 650; }
+    .change-note { margin: 9px 0 0; color: #76501d; font-size: 11px; line-height: 1.55; }
+    .updated-inline { display: inline-flex; align-items: center; margin-left: 6px; padding: 2px 6px; border-radius: 8px; background: #fff2dc; color: #9a5800; font-size: 9px; font-weight: 700; vertical-align: 1px; }
+
+    .edit-context { padding: 18px 16px 15px; background: var(--paper); }
+    .edit-context-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .edit-context h1 { margin: 0; font-size: 25px; line-height: 1.25; }
+    .edit-context p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .change-quota { flex: 0 0 auto; min-width: 76px; padding: 9px 10px; border-radius: 12px; background: var(--accent-soft); text-align: center; }
+    .change-quota strong { display: block; color: var(--accent-strong); font-size: 18px; font-variant-numeric: tabular-nums; }
+    .change-quota span { display: block; margin-top: 2px; color: #567067; font-size: 10px; }
+    .change-quota.final { background: #fff2dc; }
+    .change-quota.final strong { color: #9a5800; }
+    .change-meter { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 15px; }
+    .change-meter span { height: 5px; border-radius: 5px; background: rgba(118,118,128,.16); }
+    .change-meter span.used { background: var(--accent); }
+    .change-meter span.next { background: #ff9f0a; }
+    .quota-note { display: flex; gap: 8px; margin-top: 12px; padding: 10px 11px; border-radius: 10px; background: #fff7e8; color: #76501d; font-size: 11px; line-height: 1.5; }
+    .quota-note svg { flex: 0 0 auto; width: 16px; height: 16px; margin-top: 1px; }
+    .changed-field { position: relative; }
+    .changed-field::after { content: "已修改"; position: absolute; top: 0; right: 0; color: #b76800; font-size: 10px; font-weight: 700; }
+    .change-summary-box { padding: 13px; border-radius: 12px; background: #fff7e8; }
+    .change-summary-box label { color: #70430c; }
+    .change-summary-box textarea { background: rgba(255,255,255,.82); box-shadow: inset 0 0 0 1px rgba(224,126,0,.18); }
+    .summary-counter { margin-top: 6px; color: #9a6b31; font-size: 10px; text-align: right; }
+    .notice-preview { margin-top: 14px; padding: 13px; border-radius: 12px; background: rgba(118,118,128,.07); }
+    .notice-preview-head { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 10px; }
+    .notice-preview strong { display: block; margin-top: 8px; font-size: 13px; }
+    .notice-preview p { margin: 5px 0 0; color: #4b4b4e; font-size: 12px; line-height: 1.55; }
+    .edit-save-note { margin: 9px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; text-align: center; }
+    .change-complete { display: none; padding: 42px 22px; text-align: center; }
+    .change-complete.show { display: block; }
+    .change-complete-icon { display: grid; width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); place-items: center; }
+    .change-complete-icon svg { width: 31px; height: 31px; }
+    .change-complete h2 { margin: 0; font-size: 22px; }
+    .change-complete p { margin: 9px auto 20px; max-width: 280px; color: var(--muted); font-size: 13px; line-height: 1.65; }
+    .change-locked { margin-top: 12px; padding: 11px; border-radius: 10px; background: rgba(118,118,128,.08); color: var(--muted); font-size: 11px; }
+
     .route-map { height: 326px; background: #e7ece9; }
     .poi { border-bottom: .5px solid var(--line); }
     .poi-icon { background: var(--accent); }
@@ -721,10 +786,11 @@
           <button class="active" data-screen-link="privacy"><i data-lucide="shield-check"></i><span>00 · 隐私声明与登录</span></button>
           <button data-screen-link="gateway"><i data-lucide="bike"></i><span>01 · 骑行动态入口</span></button>
           <button data-screen-link="home"><i data-lucide="calendar-days"></i><span>02 · 活动发现</span></button>
-          <button data-screen-link="detail"><i data-lucide="file-text"></i><span>03 · 活动详情与报名</span></button>
+          <button data-screen-link="detail"><i data-lucide="file-text"></i><span>03 · 活动详情与变更提醒</span></button>
+          <button data-screen-link="change"><i data-lucide="square-pen"></i><span>04 · 发布者修改活动</span></button>
           <!-- 路书入口暂时停用，保留代码便于后续恢复。 -->
-          <button data-screen-link="publish"><i data-lucide="circle-plus"></i><span>04 · 发布活动</span></button>
-          <button data-screen-link="profile"><i data-lucide="user-round"></i><span>05 · 我的活动</span></button>
+          <button data-screen-link="publish"><i data-lucide="circle-plus"></i><span>05 · 发布活动</span></button>
+          <button data-screen-link="profile"><i data-lucide="user-round"></i><span>06 · 我的活动</span></button>
       </nav>
       <div class="review-note">点击活动卡片、报名按钮、路书卡片和底部导航可体验主流程。原型状态会在页面间同步。</div>
     </aside>
@@ -803,13 +869,19 @@
             <div class="detail-panel">
               <div><span class="badge red" id="detailStatus">报名中</span> <span class="badge">公路车 · 进阶</span></div>
               <h1>妙峰山晨骑挑战</h1>
-              <div class="meta-line"><i data-lucide="calendar-days"></i>8月8日 周六 06:30–12:30</div>
-              <div class="meta-line"><i data-lucide="map-pin"></i>苹果园地铁站 A 口集合</div>
+              <div class="meta-line"><i data-lucide="calendar-days"></i>8月8日 周六 07:00–12:30 <span class="updated-inline">已更新</span></div>
+              <div class="meta-line"><i data-lucide="map-pin"></i>苹果园地铁站 D 口集合 <span class="updated-inline">已更新</span></div>
               <div class="metric-row">
                 <div class="metric"><strong>82 km</strong><span>距离</span></div><div class="metric"><strong>1,260 m</strong><span>爬升</span></div><div class="metric"><strong>24–28</strong><span>均速</span></div><div class="metric"><strong id="capacityMetric">23/30</strong><span>人数</span></div>
               </div>
               <div class="organizer"><div class="avatar">北</div><div><strong>北风骑行社</strong><br><small>认证组织者 · 已发起 48 场</small></div></div>
             </div>
+            <aside class="change-alert" aria-label="活动重要变更提醒">
+              <div class="change-alert-head"><div class="change-alert-title"><i data-lucide="bell-ring"></i><span>重要变更</span></div><span class="change-alert-time">今天 09:42 更新</span></div>
+              <p class="change-alert-summary">集合时间调整至 07:00，集合点改为苹果园地铁站 D 口。</p>
+              <button class="change-alert-link" id="viewChangeDetail" aria-expanded="false">查看变更详情 <i data-lucide="chevron-down"></i></button>
+              <div class="change-alert-detail" id="changeAlertDetail" hidden><div class="change-diff"><span class="change-diff-label">原定</span><span class="change-diff-old">06:30 · 苹果园地铁站 A 口</span><span class="change-diff-label">最新</span><span class="change-diff-new">07:00 · 苹果园地铁站 D 口</span></div><p class="change-note">发布者说明：因地铁口临时施工，调整至 D 口集合，请预留出行时间。</p></div>
+            </aside>
             <!-- 活动详情内的路书入口暂时停用。 -->
             <section class="detail-section"><h2>参加要求</h2><div class="requirement-list"><div class="requirement"><i data-lucide="circle-check"></i><span>近 30 天内完成过 70 km 以上公路骑行</span></div><div class="requirement"><i data-lucide="circle-check"></i><span>必须佩戴头盔，自备补胎工具、前后车灯</span></div><div class="requirement"><i data-lucide="triangle-alert" style="color:var(--amber)"></i><span>连续爬坡约 11 km，返程含连续弯道，请谨慎评估能力</span></div></div></section>
             <section class="detail-section"><h2>活动说明</h2><p style="font-size:13px;line-height:1.75;margin:0;color:var(--muted)">全程不拉爆，山脚按能力分组。妙峰山顶统一合影，返程在担礼村补给。遇中雨或道路管制将提前取消并通知。</p></section>
@@ -824,8 +896,50 @@
             <section class="detail-section"><h2>沿途关键点</h2><div class="poi-list"><div class="poi"><span class="poi-icon"><i data-lucide="coffee"></i></span><div><strong>十三陵水库便利店</strong><br><small>24.6 km · 补水和简餐</small></div><small>补给</small></div><div class="poi"><span class="poi-icon warn"><i data-lucide="triangle-alert"></i></span><div><strong>蟒山连续弯道</strong><br><small>41.8 km · 下坡控制速度</small></div><small>风险</small></div><div class="poi"><span class="poi-icon"><i data-lucide="wrench"></i></span><div><strong>捷安特昌平店</strong><br><small>61.2 km · 维修点</small></div><small>维修</small></div></div></section>
             <div class="sticky-action"><button class="icon-btn" aria-label="收藏路书"><i data-lucide="bookmark"></i></button><button class="text-btn secondary" id="offlineButton">下载离线</button><button class="text-btn dark" id="trackButton">轨迹跟随</button></div>
           </section>
+
           -->
 
+          <section class="screen" id="screen-change">
+            <header class="topbar"><button class="icon-btn back-btn" aria-label="返回活动详情" data-go="detail"><i data-lucide="chevron-left"></i></button><div class="topbar-title" style="font-size:18px">修改活动</div><button class="icon-btn" aria-label="关闭" data-go="profile"><i data-lucide="x"></i></button></header>
+            <div id="changeEditor">
+              <div class="edit-context">
+                <div class="edit-context-row"><div><h1>妙峰山晨骑挑战</h1><p>保存后，23 位已报名骑友将收到活动变更提醒。</p></div><div class="change-quota final"><strong id="changeQuotaText">2 / 3</strong><span>已用修改次数</span></div></div>
+                <div class="change-meter" aria-label="已修改 2 次，剩余 1 次"><span class="used"></span><span class="used"></span><span class="next"></span></div>
+                <div class="quota-note"><i data-lucide="triangle-alert"></i><span><strong>这是最后一次可修改机会。</strong><br>每场活动最多修改 3 次，保存成功后不可撤销次数。</span></div>
+              </div>
+              <section class="form-section">
+                <h2>活动信息</h2>
+                <div class="field"><label>活动封面</label><div class="route-select"><img class="route-thumb" src="assets/ride-group.jpg" alt="当前活动封面"><div style="flex:1"><strong>妙峰山晨骑挑战</strong><small>点击更换活动封面</small></div><i data-lucide="image-plus"></i></div></div>
+                <div class="field"><label for="changeTitle">活动名称</label><input id="changeTitle" value="妙峰山晨骑挑战"></div>
+                <div class="field"><label>活动路书</label><div class="route-select"><img class="route-thumb" src="assets/route-mountain-v2.jpg" alt="当前活动路书"><div style="flex:1"><strong>妙峰山往返路线</strong><small>82 km · 爬升 1,260 m</small></div><i data-lucide="chevron-right"></i></div></div>
+                <div class="field-row"><div class="field"><label for="changeDate">出发日期</label><input id="changeDate" type="date" value="2026-08-08"></div><div class="field changed-field"><label for="changeTime">集合时间</label><input id="changeTime" type="time" value="07:00"></div></div>
+                <div class="field changed-field"><label for="changeMeeting">集合地点</label><input id="changeMeeting" value="苹果园地铁站 D 口"></div>
+                <div class="field-row"><div class="field"><label for="changeSpeed">目标均速</label><select id="changeSpeed"><option selected>24–28 km/h</option><option>22–25 km/h</option><option>28–32 km/h</option></select></div><div class="field"><label for="changeCapacity">人数上限</label><input id="changeCapacity" type="number" value="30"></div></div>
+                <div class="field"><label for="changeDescription">活动说明</label><textarea id="changeDescription">全程不拉爆，山脚按能力分组。妙峰山顶统一合影，返程在担礼村补给。</textarea></div>
+              </section>
+              <section class="form-section">
+                <h2>装备与能力要求</h2>
+                <div class="option-grid">
+                  <label class="option-check"><input type="checkbox" checked><span>骑行头盔</span></label>
+                  <label class="option-check"><input type="checkbox" checked><span>前后车灯</span></label>
+                  <label class="option-check"><input type="checkbox" checked><span>补胎工具</span></label>
+                  <label class="option-check"><input type="checkbox" checked><span>备用内胎</span></label>
+                </div>
+                <div class="field-row" style="margin-top:15px"><div class="field"><label for="changeDistanceRequirement">近期距离</label><select id="changeDistanceRequirement"><option selected>完成过 70 km</option><option>完成过 50 km</option></select></div><div class="field"><label for="changeClimbRequirement">近期爬升</label><select id="changeClimbRequirement"><option selected>完成过 1,000 m</option><option>完成过 800 m</option></select></div></div>
+                <div class="field"><label for="changeReason">修改原因</label><select id="changeReason"><option selected>集合安排调整</option><option>路线或路况变化</option><option>天气原因</option><option>其他</option></select></div>
+              </section>
+              <section class="form-section">
+                <h2>参与者提醒</h2>
+                <div class="field change-summary-box"><label for="changeSummary">变更摘要</label><textarea id="changeSummary" maxlength="80">集合时间调整至 07:00，集合点改为苹果园地铁站 D 口。</textarea><div class="summary-counter"><span id="summaryCount">30</span> / 80</div></div>
+                <div class="notice-preview"><div class="notice-preview-head"><span>参与者看到的提醒</span><span>预览</span></div><strong><i data-lucide="bell-ring" style="width:15px;vertical-align:-3px;color:#b76800"></i> 妙峰山晨骑挑战有重要变更</strong><p id="changePreviewText">集合时间调整至 07:00，集合点改为苹果园地铁站 D 口。</p></div>
+                <button class="text-btn primary" id="saveActivityChange" style="margin-top:16px">保存并提醒 23 位参与者</button>
+                <p class="edit-save-note">保存即计为第 3 次修改，并同步更新活动详情。</p>
+              </section>
+            </div>
+            <div class="change-complete" id="changeComplete">
+              <div class="change-complete-icon"><i data-lucide="check"></i></div><h2>活动信息已更新</h2><p>变更提醒已生成，23 位参与者可在活动详情中查看最新信息。</p><button class="text-btn primary" data-go="detail">查看参与者视图</button><div class="change-locked"><strong>3 / 3 次修改已用完</strong><br>此活动后续不可再编辑，请通过取消活动处理重大变化。</div>
+            </div>
+          </section>
           <section class="screen" id="screen-publish">
             <header class="topbar"><div class="topbar-title">发布活动</div><button class="icon-btn" aria-label="关闭" data-go="home"><i data-lucide="x"></i></button></header>
             <div class="publish-intro"><h1>创建一场骑行</h1><p>活动信息会直接影响骑友是否报名，请准确填写。</p><div class="stepper" aria-label="步骤 1 / 4"><span class="step done"></span><span class="step"></span><span class="step"></span><span class="step"></span></div></div>
@@ -874,8 +988,9 @@
 
           <section class="screen" id="screen-profile">
             <div class="profile-head"><div class="profile-row"><div class="avatar">林</div><div><div class="profile-name">林川</div><div class="profile-note">北京 · 骑行 3 年 · 认证骑友</div></div></div><div class="profile-stats"><div><strong>1,284 km</strong><span>本赛季</span></div><div><strong>26.4</strong><span>常用均速</span></div><div><strong>8,620 m</strong><span>累计爬升</span></div></div></div>
-            <div class="status-card" id="profileRide"><div class="status-top"><span class="badge amber">待报名</span><span style="font-size:12px;color:var(--muted)">8月8日</span></div><h3>妙峰山晨骑挑战</h3><div class="meta-line"><i data-lucide="clock"></i>06:30 · 苹果园地铁站</div><button class="text-btn secondary" style="margin-top:12px" data-go="detail">查看活动</button></div>
-            <div class="content" style="padding-bottom:4px"><div class="segmented"><button class="active">我报名的</button><button>我发布的</button></div></div>
+            <div class="content" style="padding-bottom:4px"><div class="segmented"><button class="active" data-profile-view="joined">我报名的</button><button data-profile-view="owned">我发布的</button></div></div>
+            <div class="profile-view active" id="profile-view-joined"><div class="status-card" id="profileRide"><div class="status-top"><span class="badge amber">待报名</span><span style="font-size:12px;color:var(--muted)">8月8日</span></div><h3>妙峰山晨骑挑战</h3><div class="meta-line"><i data-lucide="clock"></i>07:00 · 苹果园地铁站 D 口</div><button class="text-btn secondary" style="margin-top:12px" data-go="detail">查看活动</button></div></div>
+            <div class="profile-view" id="profile-view-owned"><article class="owned-event-card"><div class="owned-event-head"><span class="badge green">报名中</span><span class="quota-inline">已修改 2 / 3 次</span></div><h3>妙峰山晨骑挑战</h3><div class="meta-line"><i data-lucide="calendar-days"></i>8月8日 07:00 · 23 / 30 人</div><div class="meta-line"><i data-lucide="map-pin"></i>苹果园地铁站 D 口</div><div class="owned-event-actions"><button class="text-btn secondary" data-go="detail">查看详情</button><button class="text-btn primary" data-go="change">修改活动</button></div></article></div>
             <div class="menu-list"><button class="menu-item"><i data-lucide="clipboard-list"></i><span>全部活动记录</span><small>6</small><i data-lucide="chevron-right"></i></button><button class="menu-item"><i data-lucide="route"></i><span>我的路书与收藏</span><small>12</small><i data-lucide="chevron-right"></i></button><button class="menu-item"><i data-lucide="contact-round"></i><span>紧急联系人</span><small>已设置</small><i data-lucide="chevron-right"></i></button><button class="menu-item"><i data-lucide="shield-check"></i><span>认证与信用</span><small>信用良好</small><i data-lucide="chevron-right"></i></button><button class="menu-item"><i data-lucide="settings"></i><span>设置与隐私</span><i data-lucide="chevron-right"></i></button></div>
           </section>
         </div>
@@ -950,6 +1065,27 @@
     document.getElementById('finishRegistration').addEventListener('click', () => { sheet.classList.remove('open'); showScreen('profile'); });
     // 路书页停用期间不注册离线下载和轨迹跟随事件。
     document.getElementById('nextPublish').addEventListener('click', () => showToast('草稿已保存 · 进入第 2 步'));
+    const changeSummary = document.getElementById('changeSummary');
+    changeSummary.addEventListener('input', () => {
+      const summary = changeSummary.value.trim();
+      document.getElementById('summaryCount').textContent = changeSummary.value.length;
+      document.getElementById('changePreviewText').textContent = summary || '请填写简洁的变更摘要';
+    });
+    document.getElementById('saveActivityChange').addEventListener('click', () => {
+      if (!changeSummary.value.trim()) return showToast('请填写变更摘要');
+      document.getElementById('changeEditor').hidden = true;
+      document.getElementById('changeComplete').classList.add('show');
+      mainScroll.scrollTop = 0;
+      if (window.lucide) lucide.createIcons();
+    });
+    document.getElementById('viewChangeDetail').addEventListener('click', event => {
+      const detail = document.getElementById('changeAlertDetail');
+      const expanded = detail.hidden;
+      detail.hidden = !expanded;
+      event.currentTarget.setAttribute('aria-expanded', String(expanded));
+      event.currentTarget.innerHTML = `${expanded ? '收起' : '查看'}变更详情 <i data-lucide="chevron-${expanded ? 'up' : 'down'}"></i>`;
+      if (window.lucide) lucide.createIcons();
+    });
     document.getElementById('agreePrivacy').addEventListener('click', () => {
       document.getElementById('privacyConsent').hidden = true;
       document.getElementById('privacyProfile').hidden = false;
@@ -962,6 +1098,12 @@
     document.querySelectorAll('.requirement-option').forEach(option => option.addEventListener('change', () => {
       const selected = document.querySelectorAll('.requirement-option:checked').length;
       document.getElementById('requirementSummary').textContent = `已设置 ${selected} 项必备要求，并启用距离、爬升与车型门槛。`;
+    }));
+    document.querySelectorAll('[data-profile-view]').forEach(button => button.addEventListener('click', () => {
+      const target = button.dataset.profileView;
+      document.querySelectorAll('[data-profile-view]').forEach(item => item.classList.toggle('active', item === button));
+      document.querySelectorAll('.profile-view').forEach(view => view.classList.toggle('active', view.id === `profile-view-${target}`));
+      if (window.lucide) lucide.createIcons();
     }));
 
     function showToast(message) {

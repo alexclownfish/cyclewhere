@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -171,11 +172,143 @@ func TestPostgresRegistrationIsIdempotentAndDoesNotOversell(t *testing.T) {
 	}
 }
 
+func TestPostgresEventChangesAreAtomicAndLimited(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	repository := NewPostgres(pool)
+	now := time.Date(2026, 8, 13, 3, 0, 0, 0, time.UTC)
+	event := domain.Event{
+		ID: uuid.NewString(), OrganizerID: uuid.NewString(), Title: "Atomic change test",
+		Summary: "Verifies event update quota and history in one database transaction.",
+		StartAt: now.Add(72 * time.Hour), RegistrationDeadline: now.Add(48 * time.Hour),
+		MeetingPoint: "Integration meeting point", Difficulty: domain.DifficultyModerate,
+		DistanceKM: 80, ElevationGainM: 600, SpeedMinKPH: 22, SpeedMaxKPH: 28,
+		Capacity: 20, EquipmentRequirements: []string{"helmet"}, AbilityRequirements: []string{"recent ride"},
+		SafetyNotice: "Integration test event; remove after test.", Status: domain.EventPublished,
+		CreatedAt: now, UpdatedAt: now, Version: 1,
+	}
+	if _, err := repository.CreateEvent(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM events WHERE id=$1`, event.ID) })
+
+	for number := 1; number <= domain.EventChangeLimit; number++ {
+		event.Title = fmt.Sprintf("Atomic change test %d", number)
+		event.UpdatedAt = now.Add(time.Duration(number) * time.Minute)
+		event.Version++
+		updated, err := repository.UpdateEventWithChange(ctx, event, domain.EventChange{
+			ID: uuid.NewString(), EventID: event.ID, Summary: fmt.Sprintf("Change %d", number),
+			ChangedFields: []domain.EventChangedField{{Field: "title", Before: "old", After: event.Title}},
+			CreatedAt:     event.UpdatedAt,
+		})
+		if err != nil {
+			t.Fatalf("change %d: %v", number, err)
+		}
+		event = updated
+		if event.ChangeCount != number {
+			t.Fatalf("change count=%d, want %d", event.ChangeCount, number)
+		}
+	}
+	event.Title = "Rejected fourth change"
+	event.UpdatedAt = now.Add(4 * time.Minute)
+	event.Version++
+	_, err = repository.UpdateEventWithChange(ctx, event, domain.EventChange{
+		ID: uuid.NewString(), EventID: event.ID, Summary: "Fourth change", CreatedAt: event.UpdatedAt,
+		ChangedFields: []domain.EventChangedField{{Field: "title", Before: "old", After: event.Title}},
+	})
+	var domainError *domain.Error
+	if !errors.As(err, &domainError) || domainError.Code != "EVENT_CHANGE_LIMIT_REACHED" {
+		t.Fatalf("expected change limit, got %v", err)
+	}
+	stored, err := repository.GetEvent(ctx, event.ID)
+	if err != nil || stored == nil || stored.ChangeCount != domain.EventChangeLimit || stored.Title == event.Title {
+		t.Fatalf("failed fourth change was not rolled back: event=%+v err=%v", stored, err)
+	}
+	changes, err := repository.ListEventChanges(ctx, event.ID)
+	if err != nil || len(changes) != domain.EventChangeLimit {
+		t.Fatalf("history=%+v err=%v", changes, err)
+	}
+}
+
 func integrationCommand(eventID, userID, key string, now time.Time) domain.RegisterCommand {
 	return domain.RegisterCommand{
 		EventID: eventID, UserID: userID, IdempotencyKey: key,
 		AbilityConfirmed: true, EquipmentConfirmed: true, WaiverVersion: "v1.0",
 		PhoneEncrypted:            "v1.integration-test-ciphertext",
 		EmergencyContactEncrypted: "v1.integration-test-ciphertext", BikeType: "road", Now: now,
+	}
+}
+
+func TestPostgresEventChangeLimitIsAtomic(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	repository := NewPostgres(pool)
+	now := time.Now().UTC()
+	event := domain.Event{
+		ID: uuid.NewString(), OrganizerID: uuid.NewString(), Title: "Concurrent change test",
+		Summary: "Integration test for the final remaining activity change.",
+		StartAt: now.Add(72 * time.Hour), RegistrationDeadline: now.Add(48 * time.Hour), MeetingPoint: "Test start",
+		Difficulty: domain.DifficultyModerate, DistanceKM: 50, ElevationGainM: 300, SpeedMinKPH: 20, SpeedMaxKPH: 25,
+		Capacity: 10, EquipmentRequirements: []string{"helmet"}, AbilityRequirements: []string{"recent ride"},
+		SafetyNotice: "Integration test record; this is not a public activity.", Status: domain.EventPublished,
+		CreatedAt: now, UpdatedAt: now, Version: 1, ChangeCount: 2,
+	}
+	if _, err = repository.CreateEvent(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = pool.Exec(ctx, `UPDATE events SET change_count=2 WHERE id=$1`, event.ID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM events WHERE id=$1`, event.ID) })
+
+	results := make(chan error, 2)
+	for index := 0; index < 2; index++ {
+		go func(index int) {
+			candidate := event
+			candidate.Title = fmt.Sprintf("Concurrent title %d", index)
+			candidate.Version = event.Version + 1
+			candidate.UpdatedAt = now.Add(time.Duration(index+1) * time.Second)
+			_, err := repository.UpdateEventWithChange(ctx, candidate, domain.EventChange{
+				ID: uuid.NewString(), EventID: event.ID, Summary: "Concurrent update", ChangeNumber: 3,
+				ChangedFields: []domain.EventChangedField{{Field: "title", Before: event.Title, After: candidate.Title}}, CreatedAt: candidate.UpdatedAt,
+			})
+			results <- err
+		}(index)
+	}
+	successes := 0
+	for index := 0; index < 2; index++ {
+		if result := <-results; result == nil {
+			successes++
+		}
+	}
+	if successes != 1 {
+		t.Fatalf("expected exactly one successful final change, got %d", successes)
+	}
+	stored, err := repository.GetEvent(ctx, event.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changes, err := repository.ListEventChanges(ctx, event.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored == nil || stored.ChangeCount != 3 || len(changes) != 1 || changes[0].ChangeNumber != 3 {
+		t.Fatalf("unexpected final state: event=%+v changes=%+v", stored, changes)
 	}
 }

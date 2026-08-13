@@ -20,7 +20,7 @@ func eventResponse(event domain.Event) gin.H {
 	if ability == nil {
 		ability = []string{}
 	}
-	return gin.H{
+	response := gin.H{
 		"id": event.ID, "organizerId": event.OrganizerID, "routeId": event.RouteID,
 		"title": event.Title, "summary": event.Summary, "coverUrl": event.CoverURL, "startAt": isoTime(event.StartAt),
 		"registrationDeadline": isoTime(event.RegistrationDeadline), "meetingPoint": event.MeetingPoint,
@@ -30,6 +30,24 @@ func eventResponse(event domain.Event) gin.H {
 		"registrationCount": event.RegistrationCount, "equipmentRequirements": equipment,
 		"abilityRequirements": ability, "safetyNotice": event.SafetyNotice, "status": event.Status,
 		"createdAt": isoTime(event.CreatedAt), "updatedAt": isoTime(event.UpdatedAt), "version": event.Version,
+		"changeCount": event.ChangeCount, "changeLimit": domain.EventChangeLimit,
+	}
+	if event.LatestChange == nil {
+		response["latestChange"] = nil
+	} else {
+		response["latestChange"] = eventChangeResponse(*event.LatestChange)
+	}
+	return response
+}
+
+func eventChangeResponse(change domain.EventChange) gin.H {
+	fields := change.ChangedFields
+	if fields == nil {
+		fields = []domain.EventChangedField{}
+	}
+	return gin.H{
+		"summary": change.Summary, "changeNumber": change.ChangeNumber,
+		"changedFields": fields, "createdAt": isoTime(change.CreatedAt),
 	}
 }
 

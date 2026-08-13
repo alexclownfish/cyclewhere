@@ -8,6 +8,13 @@
       <view class="detail-title">{{event.title}}</view>
       <view class="organizer"><view class="avatar"><image wx:if="{{event.organizerAvatarUrl}}" class="avatar-image" src="{{event.organizerAvatarUrl}}" mode="aspectFill" /><text wx:else>{{organizerInitial}}</text></view><view class="organizer-copy"><view>{{event.organizer}}</view><view class="small">活动组织者</view></view><view class="verified-mark">✓</view></view>
     </view>
+    <view wx:if="{{changeNotice}}" class="change-notice" bindtap="toggleChangeNotice" role="button" aria-label="查看活动变更详情">
+      <view class="change-notice-head"><view class="change-mark">!</view><view class="change-heading"><view class="change-kicker">重要变更{{changeNotice.changeNumber ? (' · 第 ' + changeNotice.changeNumber + ' 次修改') : ''}}</view><view class="change-time">{{changeNotice.timeText}}</view></view><text wx:if="{{changeNotice.changedFields.length}}" class="change-toggle">{{changeExpanded ? '收起' : '查看详情'}}</text></view>
+      <view class="change-summary">{{changeNotice.summary}}</view>
+      <view wx:if="{{changeExpanded && changeNotice.changedFields.length}}" class="change-comparisons">
+        <view wx:for="{{changeNotice.changedFields}}" wx:key="field" class="change-row"><view class="change-field">{{item.field}}</view><view class="change-values"><text class="change-before">{{item.before}}</text><text class="change-arrow">→</text><text class="change-after">{{item.after}}</text></view></view>
+      </view>
+    </view>
     <view class="detail-section">
       <view class="section-kicker">RIDE PLAN</view><view class="form-title">出发信息</view>
       <view class="info-grid"><view class="info"><text class="info-label">时间</text><text>{{dateText}}</text></view><view class="info location-info" role="button" aria-label="打开集合点地图导航" bindtap="openMeetingPoint"><view class="location-copy"><text class="info-label">集合</text><text>{{event.meetingPoint}}</text><text class="location-hint">地图导航</text></view><text class="location-chevron">›</text></view><view class="info"><text class="info-label">巡航</text><text>{{event.speedRange}}</text></view><view class="info"><text class="info-label">规模</text><text>{{event.registeredCount}} / {{event.capacity}} 人</text></view></view>

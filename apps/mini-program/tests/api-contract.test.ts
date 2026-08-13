@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { ApiError, createAuthenticationProvider, createRealApi, normalizeRequestSpec, type RequestSpec, type Transport } from '../services/api.ts';
 import { mapEvent, toCreateEvent, type BackendEvent, type BackendRegistrationResult, type BackendRoadbook } from '../services/api-contract.ts';
-import type { PublishEventInput, RegistrationInput } from '../types/domain.ts';
+import type { PublishEventInput, RegistrationInput, UpdateEventInput } from '../types/domain.ts';
 
 const roadbook: BackendRoadbook = {
   id: 'route-1', ownerId: 'organizer-demo', name: '西湖群山环线', description: '测试路书说明', distanceKm: 68.4,
@@ -316,17 +316,20 @@ test('event edit uses the WeChat-compatible PUT endpoint with organizer authenti
     if (spec.url === '/api/v1/events/event-1') return { ...backendEvent, title: '更新后的活动' } as T;
     throw new Error(`unexpected ${spec.url}`);
   };
-  const input: PublishEventInput = {
+  const input: UpdateEventInput = {
     title: '更新后的活动', date: '2026-09-13', time: '07:00', meetingPoint: '杭州龙井路停车场入口',
     routeId: 'route-1', capacity: 20, speedRange: '24-29 km/h', description: '遵守交通规则，路线可能因天气调整。',
     requirements: { equipment: ['头盔'], recentDistanceKm: 60, recentElevationM: 800, bikeTypes: ['公路车'], disciplines: ['听从领队指挥'] },
+    changeSummary: 'Meeting time adjusted to 07:00',
   };
   const updated = await createRealApi(transport, 'organizer-demo', auth).updateEvent('event-1', input);
   assert.equal(updated.title, '更新后的活动');
   assert.deepEqual(calls.map((item) => `${item.method} ${item.url}`), [
-    'GET /api/v1/routes/route-1', 'PUT /api/v1/events/event-1',
+    'GET /api/v1/events/event-1', 'GET /api/v1/routes/route-1', 'PUT /api/v1/events/event-1',
   ]);
-  assert.equal(calls[1].header?.Authorization, 'Bearer verified-test-token');
+  assert.equal(calls[2].header?.Authorization, 'Bearer verified-test-token');
+  assert.equal((calls[2].data as any).changeSummary, input.changeSummary);
+  assert.equal((calls[2].data as any).registrationDeadline, backendEvent.registrationDeadline);
 });
 
 test('profile APIs read and save the authenticated WeChat profile', async () => {

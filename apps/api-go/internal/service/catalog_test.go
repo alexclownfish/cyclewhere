@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ type testRepository struct {
 	profiles        map[string]domain.UserProfile
 	registration    *domain.Registration
 	registerCommand *domain.RegisterCommand
+	changes         []domain.EventChange
 }
 
 func newTestRepository() *testRepository {
@@ -49,6 +51,27 @@ func (r *testRepository) CreateEvent(_ context.Context, value domain.Event) (dom
 func (r *testRepository) UpdateEvent(_ context.Context, value domain.Event) (domain.Event, error) {
 	r.events[value.ID] = value
 	return value, nil
+}
+func (r *testRepository) UpdateEventWithChange(_ context.Context, value domain.Event, change domain.EventChange) (domain.Event, error) {
+	current := r.events[value.ID]
+	if current.ChangeCount >= domain.EventChangeLimit {
+		return domain.Event{}, domain.Conflict("EVENT_CHANGE_LIMIT_REACHED", "activity change limit reached")
+	}
+	value.ChangeCount = current.ChangeCount + 1
+	change.ChangeNumber = value.ChangeCount
+	value.LatestChange = &change
+	r.events[value.ID] = value
+	r.changes = append(r.changes, change)
+	return value, nil
+}
+func (r *testRepository) ListEventChanges(_ context.Context, eventID string) ([]domain.EventChange, error) {
+	items := make([]domain.EventChange, 0)
+	for _, change := range r.changes {
+		if change.EventID == eventID {
+			items = append(items, change)
+		}
+	}
+	return items, nil
 }
 func (r *testRepository) GetEvent(_ context.Context, id string) (*domain.Event, error) {
 	value, ok := r.events[id]
@@ -114,20 +137,98 @@ func fixtureEvent() domain.Event {
 	}
 }
 
+func TestPublishedEventChangeLimitAndSummary(t *testing.T) {
+	repository := newTestRepository()
+	event := fixtureEvent()
+	repository.events[event.ID] = event
+	catalog := NewCatalog(repository, func() time.Time { return fixedNow.Add(time.Hour) })
+
+	for index := 1; index <= domain.EventChangeLimit; index++ {
+		title := fmt.Sprintf("Updated activity %d", index)
+		changeSummary := fmt.Sprintf("Change %d", index)
+		if index == 1 {
+			changeSummary = strings.Repeat("改", 80)
+		}
+		updated, err := catalog.UpdateEvent(context.Background(), event.ID, event.OrganizerID, EventPatch{Title: &title, ChangeSummary: changeSummary})
+		if err != nil {
+			t.Fatalf("change %d failed: %v", index, err)
+		}
+		if updated.ChangeCount != index || updated.LatestChange == nil || updated.LatestChange.ChangeNumber != index {
+			t.Fatalf("unexpected change state: %+v", updated)
+		}
+	}
+	title := "Fourth update"
+	_, err := catalog.UpdateEvent(context.Background(), event.ID, event.OrganizerID, EventPatch{Title: &title, ChangeSummary: "Fourth"})
+	var domainError *domain.Error
+	if !errors.As(err, &domainError) || domainError.Code != "EVENT_CHANGE_LIMIT_REACHED" {
+		t.Fatalf("expected change limit, got %v", err)
+	}
+	if len(repository.changes) != domain.EventChangeLimit {
+		t.Fatalf("unexpected history count: %d", len(repository.changes))
+	}
+}
+
+func TestPublishedEventChangeRejectsInvalidSummaryAndNoop(t *testing.T) {
+	repository := newTestRepository()
+	event := fixtureEvent()
+	repository.events[event.ID] = event
+	catalog := NewCatalog(repository, func() time.Time { return fixedNow })
+	title := "Changed title"
+	_, err := catalog.UpdateEvent(context.Background(), event.ID, event.OrganizerID, EventPatch{Title: &title, ChangeSummary: "   "})
+	var domainError *domain.Error
+	if !errors.As(err, &domainError) || domainError.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected summary validation, got %v", err)
+	}
+	longSummary := strings.Repeat("改", 81)
+	_, err = catalog.UpdateEvent(context.Background(), event.ID, event.OrganizerID, EventPatch{Title: &title, ChangeSummary: longSummary})
+	if !errors.As(err, &domainError) || domainError.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected long summary validation, got %v", err)
+	}
+	_, err = catalog.UpdateEvent(context.Background(), event.ID, event.OrganizerID, EventPatch{Title: &event.Title, ChangeSummary: "No-op"})
+	if !errors.As(err, &domainError) || domainError.Code != "EVENT_NO_CHANGES" {
+		t.Fatalf("expected no-op rejection, got %v", err)
+	}
+	if len(repository.changes) != 0 || repository.events[event.ID].ChangeCount != 0 {
+		t.Fatal("failed changes consumed quota")
+	}
+}
+
+func TestPublishedEventWithRegistrationsCanChangeKeyDetails(t *testing.T) {
+	repository := newTestRepository()
+	event := fixtureEvent()
+	event.RegistrationCount = 2
+	repository.events[event.ID] = event
+	catalog := NewCatalog(repository, func() time.Time { return fixedNow })
+	startAt := event.StartAt.Add(time.Hour)
+	deadline := event.RegistrationDeadline.Add(time.Hour)
+	meetingPoint := "新的集合地点"
+	capacity := event.RegistrationCount
+	updated, err := catalog.UpdateEvent(context.Background(), event.ID, event.OrganizerID, EventPatch{
+		StartAt: &startAt, RegistrationDeadline: &deadline, MeetingPoint: &meetingPoint,
+		Capacity: &capacity, ChangeSummary: "集合时间和地点已调整",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ChangeCount != 1 || updated.StartAt != startAt || updated.MeetingPoint != meetingPoint || updated.Capacity != event.RegistrationCount {
+		t.Fatalf("key detail update was not preserved: %+v", updated)
+	}
+}
+
 func TestUpdateEventEnforcesOwnershipAndRegistrationRestrictions(t *testing.T) {
 	repository := newTestRepository()
 	event := fixtureEvent()
 	event.RegistrationCount = 1
 	repository.events[event.ID] = event
 	catalog := NewCatalog(repository, func() time.Time { return fixedNow })
-	capacity := 20
+	capacity := 0
 	_, err := catalog.UpdateEvent(context.Background(), event.ID, event.OrganizerID, EventPatch{Capacity: &capacity})
 	var domainError *domain.Error
 	if !errors.As(err, &domainError) || domainError.Code != "INVALID_STATE" {
 		t.Fatalf("expected INVALID_STATE, got %v", err)
 	}
 	title := "更新后的活动标题"
-	updated, err := catalog.UpdateEvent(context.Background(), event.ID, event.OrganizerID, EventPatch{Title: &title})
+	updated, err := catalog.UpdateEvent(context.Background(), event.ID, event.OrganizerID, EventPatch{Title: &title, ChangeSummary: "更新活动标题"})
 	if err != nil {
 		t.Fatal(err)
 	}

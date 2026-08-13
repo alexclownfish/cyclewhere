@@ -18,7 +18,7 @@ const eventColumns = `
   id, organizer_id, roadbook_id, title, summary, cover_url, start_at, registration_deadline,
   meeting_point, meeting_latitude, meeting_longitude, difficulty, distance_km, elevation_gain_m, speed_min_kph,
   speed_max_kph, capacity, registration_count, equipment_requirements,
-  ability_requirements, safety_notice, status, created_at, updated_at, version`
+  ability_requirements, safety_notice, status, created_at, updated_at, version, change_count`
 
 const roadbookColumns = `
   id, owner_id, name, description, distance_km, elevation_gain_m,
@@ -115,14 +115,14 @@ func (p *Postgres) CreateEvent(ctx context.Context, event domain.Event) (domain.
     id, organizer_id, roadbook_id, title, summary, cover_url, start_at, registration_deadline,
     meeting_point, meeting_latitude, meeting_longitude, difficulty, distance_km, elevation_gain_m, speed_min_kph,
     speed_max_kph, capacity, registration_count, equipment_requirements,
-    ability_requirements, safety_notice, status, created_at, updated_at, version
-  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20::jsonb,$21,$22,$23,$24,$25)
+    ability_requirements, safety_notice, status, created_at, updated_at, version, change_count
+  ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20::jsonb,$21,$22,$23,$24,$25,$26)
   RETURNING `+eventColumns,
 		event.ID, event.OrganizerID, event.RouteID, event.Title, event.Summary, event.CoverURL, event.StartAt,
 		event.RegistrationDeadline, event.MeetingPoint, event.MeetingLatitude, event.MeetingLongitude,
 		event.Difficulty, event.DistanceKM, event.ElevationGainM, event.SpeedMinKPH, event.SpeedMaxKPH, event.Capacity,
 		event.RegistrationCount, string(equipment), string(ability), event.SafetyNotice, event.Status,
-		event.CreatedAt, event.UpdatedAt, event.Version)
+		event.CreatedAt, event.UpdatedAt, event.Version, event.ChangeCount)
 	created, err := scanEvent(row)
 	return created, translateWriteError(err, "EVENT_EXISTS", "活动已存在")
 }
@@ -155,6 +155,60 @@ func (p *Postgres) UpdateEvent(ctx context.Context, event domain.Event) (domain.
 	return updated, err
 }
 
+func (p *Postgres) UpdateEventWithChange(ctx context.Context, event domain.Event, change domain.EventChange) (domain.Event, error) {
+	var updated domain.Event
+	err := p.withTransaction(ctx, func(tx pgx.Tx) error {
+		var currentVersion, currentCount int
+		err := tx.QueryRow(ctx, `SELECT version,change_count FROM events WHERE id=$1 FOR UPDATE`, event.ID).Scan(&currentVersion, &currentCount)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.NotFound("活动")
+		}
+		if err != nil {
+			return err
+		}
+		if currentVersion != event.Version-1 {
+			return domain.Conflict("EVENT_VERSION_CONFLICT", "活动已被其他操作更新，请刷新后重试")
+		}
+		if currentCount >= domain.EventChangeLimit {
+			return domain.Conflict("EVENT_CHANGE_LIMIT_REACHED", "活动信息最多只能修改 3 次")
+		}
+		equipment, _ := json.Marshal(event.EquipmentRequirements)
+		ability, _ := json.Marshal(event.AbilityRequirements)
+		updated, err = scanEvent(tx.QueryRow(ctx, `UPDATE events SET
+		    roadbook_id=$2,title=$3,summary=$4,cover_url=$5,start_at=$6,registration_deadline=$7,
+		    meeting_point=$8,meeting_latitude=$9,meeting_longitude=$10,difficulty=$11,distance_km=$12,elevation_gain_m=$13,
+		    speed_min_kph=$14,speed_max_kph=$15,capacity=$16,equipment_requirements=$17::jsonb,
+		    ability_requirements=$18::jsonb,safety_notice=$19,updated_at=$20,version=$21,change_count=change_count+1
+		  WHERE id=$1 AND change_count<$22 RETURNING `+eventColumns,
+			event.ID, event.RouteID, event.Title, event.Summary, event.CoverURL, event.StartAt,
+			event.RegistrationDeadline, event.MeetingPoint, event.MeetingLatitude, event.MeetingLongitude,
+			event.Difficulty, event.DistanceKM, event.ElevationGainM, event.SpeedMinKPH, event.SpeedMaxKPH,
+			event.Capacity, string(equipment), string(ability), event.SafetyNotice, event.UpdatedAt,
+			event.Version, domain.EventChangeLimit))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Conflict("EVENT_CHANGE_LIMIT_REACHED", "活动信息最多只能修改 3 次")
+		}
+		if err != nil {
+			return err
+		}
+		change.ChangeNumber = updated.ChangeCount
+		fields, err := json.Marshal(change.ChangedFields)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `INSERT INTO event_changes
+		  (id,event_id,summary,change_number,changed_fields,created_at)
+		  VALUES ($1,$2,$3,$4,$5::jsonb,$6)`, change.ID, event.ID, change.Summary,
+			change.ChangeNumber, string(fields), change.CreatedAt)
+		if err != nil {
+			return err
+		}
+		updated.LatestChange = &change
+		return nil
+	})
+	return updated, err
+}
+
 func (p *Postgres) GetEvent(ctx context.Context, id string) (*domain.Event, error) {
 	event, err := scanEvent(p.pool.QueryRow(ctx, `SELECT `+eventColumns+` FROM events WHERE id=$1`, id))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -163,7 +217,33 @@ func (p *Postgres) GetEvent(ctx context.Context, id string) (*domain.Event, erro
 	if err != nil {
 		return nil, err
 	}
+	changes, err := p.ListEventChanges(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(changes) > 0 {
+		latest := changes[0]
+		event.LatestChange = &latest
+	}
 	return &event, nil
+}
+
+func (p *Postgres) ListEventChanges(ctx context.Context, eventID string) ([]domain.EventChange, error) {
+	rows, err := p.pool.Query(ctx, `SELECT id,event_id,summary,change_number,changed_fields,created_at
+	  FROM event_changes WHERE event_id=$1 ORDER BY change_number DESC`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	changes := make([]domain.EventChange, 0)
+	for rows.Next() {
+		change, err := scanEventChange(rows)
+		if err != nil {
+			return nil, err
+		}
+		changes = append(changes, change)
+	}
+	return changes, rows.Err()
 }
 
 func (p *Postgres) ListEvents(ctx context.Context, query domain.EventListQuery) (domain.Page[domain.Event], error) {
@@ -203,6 +283,9 @@ func (p *Postgres) ListEvents(ctx context.Context, query domain.EventListQuery) 
 	if err := rows.Err(); err != nil {
 		return domain.Page[domain.Event]{}, err
 	}
+	if err := p.hydrateLatestEventChanges(ctx, items); err != nil {
+		return domain.Page[domain.Event]{}, err
+	}
 	return pageEvents(items, query.Limit), nil
 }
 
@@ -220,7 +303,51 @@ func (p *Postgres) ListEventsByOrganizer(ctx context.Context, organizerID string
 		}
 		items = append(items, event)
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := p.hydrateLatestEventChanges(ctx, items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (p *Postgres) hydrateLatestEventChanges(ctx context.Context, events []domain.Event) error {
+	ids := make([]string, 0, len(events))
+	for _, event := range events {
+		if event.ChangeCount > 0 {
+			ids = append(ids, event.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := p.pool.Query(ctx, `SELECT DISTINCT ON (event_id)
+	  id,event_id,summary,change_number,changed_fields,created_at
+	  FROM event_changes WHERE event_id=ANY($1::uuid[])
+	  ORDER BY event_id,change_number DESC`, ids)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	latest := make(map[string]domain.EventChange, len(ids))
+	for rows.Next() {
+		change, err := scanEventChange(rows)
+		if err != nil {
+			return err
+		}
+		latest[change.EventID] = change
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for index := range events {
+		if change, ok := latest[events[index].ID]; ok {
+			copy := change
+			events[index].LatestChange = &copy
+		}
+	}
+	return nil
 }
 
 func (p *Postgres) CreateRoadbook(ctx context.Context, roadbook domain.Roadbook) (domain.Roadbook, error) {
@@ -519,7 +646,7 @@ func scanEvent(row scanner) (domain.Event, error) {
 		&event.StartAt, &event.RegistrationDeadline, &event.MeetingPoint, &event.MeetingLatitude, &event.MeetingLongitude, &event.Difficulty,
 		&event.DistanceKM, &event.ElevationGainM, &event.SpeedMinKPH, &event.SpeedMaxKPH,
 		&event.Capacity, &event.RegistrationCount, &equipment, &ability, &event.SafetyNotice,
-		&event.Status, &event.CreatedAt, &event.UpdatedAt, &event.Version)
+		&event.Status, &event.CreatedAt, &event.UpdatedAt, &event.Version, &event.ChangeCount)
 	if err != nil {
 		return domain.Event{}, err
 	}
@@ -531,6 +658,22 @@ func scanEvent(row scanner) (domain.Event, error) {
 		return domain.Event{}, err
 	}
 	return event, nil
+}
+
+func scanEventChange(row scanner) (domain.EventChange, error) {
+	var change domain.EventChange
+	var fields []byte
+	err := row.Scan(&change.ID, &change.EventID, &change.Summary, &change.ChangeNumber, &fields, &change.CreatedAt)
+	if err != nil {
+		return domain.EventChange{}, err
+	}
+	if err := json.Unmarshal(fields, &change.ChangedFields); err != nil {
+		return domain.EventChange{}, err
+	}
+	if change.ChangedFields == nil {
+		change.ChangedFields = []domain.EventChangedField{}
+	}
+	return change, nil
 }
 
 func scanRoadbook(row scanner) (domain.Roadbook, error) {
@@ -587,7 +730,7 @@ func scanUserRegistration(row scanner) (domain.Registration, domain.Event, error
 		&event.StartAt, &event.RegistrationDeadline, &event.MeetingPoint, &event.MeetingLatitude, &event.MeetingLongitude, &event.Difficulty,
 		&event.DistanceKM, &event.ElevationGainM, &event.SpeedMinKPH, &event.SpeedMaxKPH,
 		&event.Capacity, &event.RegistrationCount, &equipment, &ability, &event.SafetyNotice,
-		&event.Status, &event.CreatedAt, &event.UpdatedAt, &event.Version)
+		&event.Status, &event.CreatedAt, &event.UpdatedAt, &event.Version, &event.ChangeCount)
 	if err != nil {
 		return domain.Registration{}, domain.Event{}, err
 	}

@@ -58,6 +58,7 @@ type fakeRepository struct {
 	phoneMasked    string
 	participants   map[string][]domain.EventParticipant
 	contacts       map[string]*domain.EventParticipantContact
+	changes        []domain.EventChange
 }
 
 func (f *fakeRepository) GetUserIDByPhoneHash(_ context.Context, phoneHash string) (*string, error) {
@@ -124,6 +125,38 @@ func (f *fakeRepository) UpdateEvent(_ context.Context, event domain.Event) (dom
 	}
 	f.events = append(f.events, event)
 	return event, nil
+}
+
+func (f *fakeRepository) UpdateEventWithChange(_ context.Context, event domain.Event, change domain.EventChange) (domain.Event, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for index := range f.events {
+		if f.events[index].ID != event.ID {
+			continue
+		}
+		if f.events[index].ChangeCount >= domain.EventChangeLimit {
+			return domain.Event{}, domain.Conflict("EVENT_CHANGE_LIMIT_REACHED", "activity change limit reached")
+		}
+		event.ChangeCount = f.events[index].ChangeCount + 1
+		change.ChangeNumber = event.ChangeCount
+		event.LatestChange = &change
+		f.events[index] = event
+		f.changes = append(f.changes, change)
+		return event, nil
+	}
+	return domain.Event{}, domain.NotFound("activity")
+}
+
+func (f *fakeRepository) ListEventChanges(_ context.Context, eventID string) ([]domain.EventChange, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	items := make([]domain.EventChange, 0)
+	for _, change := range f.changes {
+		if change.EventID == eventID {
+			items = append(items, change)
+		}
+	}
+	return items, nil
 }
 
 func (f *fakeRepository) GetEvent(_ context.Context, id string) (*domain.Event, error) {
@@ -503,6 +536,93 @@ func TestEventDetailUsesOrganizerProfileWithoutExposingOrganizerID(t *testing.T)
 	organizer := nestedObject(t, eventBody["organizerProfile"], "data.organizerProfile")
 	if len(organizer) != 2 || organizer["nickname"] != nickname || organizer["avatarUrl"] != avatarURL {
 		t.Fatalf("organizer profile = %#v", organizer)
+	}
+}
+
+func TestPublishedEventUpdateRequiresSummaryAndReturnsChangeContract(t *testing.T) {
+	const eventID = "77777777-7777-4777-8777-777777777777"
+	event := contractEvent()
+	event.ID = eventID
+	event.EquipmentRequirements = []string{"Helmet"}
+	event.AbilityRequirements = []string{"Recent group ride"}
+	repository := &fakeRepository{events: []domain.Event{event}}
+	router, issuer, _, _ := newContractRouter(t, repository, t.TempDir())
+	path := "/api/v1/events/" + eventID
+	authorization := authHeader(t, issuer, event.OrganizerID)
+
+	missingSummary := perform(router, http.MethodPatch, path, `{"title":"Updated title"}`, authorization)
+	if missingSummary.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("missing summary status=%d body=%s", missingSummary.Code, missingSummary.Body.String())
+	}
+	if code := nestedObject(t, decodeObject(t, missingSummary)["error"], "error")["code"]; code != "VALIDATION_ERROR" {
+		t.Fatalf("missing summary error code=%v", code)
+	}
+
+	updated := perform(router, http.MethodPatch, path, `{"title":"Updated title","changeSummary":"集合时间与说明已调整"}`, authorization)
+	if updated.Code != http.StatusOK {
+		t.Fatalf("update status=%d body=%s", updated.Code, updated.Body.String())
+	}
+	eventBody := nestedObject(t, decodeObject(t, updated)["data"], "data")
+	if eventBody["changeCount"] != float64(1) || eventBody["changeLimit"] != float64(domain.EventChangeLimit) {
+		t.Fatalf("change counters=%#v/%#v", eventBody["changeCount"], eventBody["changeLimit"])
+	}
+	latest := nestedObject(t, eventBody["latestChange"], "data.latestChange")
+	if latest["summary"] != "集合时间与说明已调整" || latest["changeNumber"] != float64(1) || latest["createdAt"] != isoTime(contractNow) {
+		t.Fatalf("latest change=%#v", latest)
+	}
+	fields, ok := latest["changedFields"].([]any)
+	if !ok || len(fields) != 1 || nestedObject(t, fields[0], "changedFields[0]")["field"] != "title" {
+		t.Fatalf("changed fields=%#v", latest["changedFields"])
+	}
+
+	noChange := perform(router, http.MethodPatch, path, `{"title":"Updated title","changeSummary":"重复保存"}`, authorization)
+	if noChange.Code != http.StatusConflict || nestedObject(t, decodeObject(t, noChange)["error"], "error")["code"] != "EVENT_NO_CHANGES" {
+		t.Fatalf("no-op status=%d body=%s", noChange.Code, noChange.Body.String())
+	}
+	if repository.events[0].ChangeCount != 1 || len(repository.changes) != 1 {
+		t.Fatalf("no-op consumed quota: event=%+v changes=%d", repository.events[0], len(repository.changes))
+	}
+	history := perform(router, http.MethodGet, path+"/changes", "", "")
+	if history.Code != http.StatusOK {
+		t.Fatalf("history status=%d body=%s", history.Code, history.Body.String())
+	}
+	historyItems := nestedObject(t, decodeObject(t, history)["data"], "data")["items"].([]any)
+	if len(historyItems) != 1 {
+		t.Fatalf("history items=%#v", historyItems)
+	}
+	historyItem := nestedObject(t, historyItems[0], "data.items[0]")
+	if _, leaked := historyItem["eventId"]; leaked {
+		t.Fatalf("history leaked internal event ID: %#v", historyItem)
+	}
+}
+
+func TestPublishedEventCoverMustBeStagedWithoutConsumingQuota(t *testing.T) {
+	const eventID = "88888888-8888-4888-8888-888888888888"
+	event := contractEvent()
+	event.ID = eventID
+	event.EquipmentRequirements = []string{"Helmet"}
+	event.AbilityRequirements = []string{"Recent group ride"}
+	repository := &fakeRepository{events: []domain.Event{event}}
+	router, issuer, _, _ := newContractRouter(t, repository, t.TempDir())
+	authorization := authHeader(t, issuer, event.OrganizerID)
+	jpeg := []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F'}
+	body := `{"data":"` + base64.StdEncoding.EncodeToString(jpeg) + `"}`
+	path := "/api/v1/events/" + eventID + "/cover/base64"
+
+	direct := perform(router, http.MethodPost, path, body, authorization)
+	if direct.Code != http.StatusConflict || nestedObject(t, decodeObject(t, direct)["error"], "error")["code"] != "COVER_STAGE_REQUIRED" {
+		t.Fatalf("direct cover status=%d body=%s", direct.Code, direct.Body.String())
+	}
+	staged := perform(router, http.MethodPost, path+"?stage=1", body, authorization)
+	if staged.Code != http.StatusCreated {
+		t.Fatalf("staged cover status=%d body=%s", staged.Code, staged.Body.String())
+	}
+	coverURL, ok := nestedObject(t, decodeObject(t, staged)["data"], "data")["coverUrl"].(string)
+	if !ok || !strings.Contains(coverURL, "/event-covers/event-"+eventID+"-") {
+		t.Fatalf("staged coverUrl=%v", coverURL)
+	}
+	if repository.events[0].ChangeCount != 0 || len(repository.changes) != 0 {
+		t.Fatalf("staging consumed quota: event=%+v changes=%d", repository.events[0], len(repository.changes))
 	}
 }
 

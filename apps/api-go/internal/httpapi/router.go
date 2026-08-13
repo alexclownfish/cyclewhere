@@ -46,7 +46,7 @@ var (
 )
 
 var avatarFileName = regexp.MustCompile(`(?i)^[0-9a-f-]{36}\.(jpg|png|webp)$`)
-var eventCoverFileName = regexp.MustCompile(`(?i)^event-[0-9a-f-]{36}\.(jpg|png|webp)$`)
+var eventCoverFileName = regexp.MustCompile(`(?i)^event-[0-9a-f-]{36}(?:-staged)?\.(jpg|png|webp)$`)
 
 type Dependencies struct {
 	Repository      domain.Repository
@@ -107,6 +107,7 @@ func NewRouter(deps Dependencies) (*gin.Engine, error) {
 	v1.GET("/event-covers/:fileName", api.getEventCover)
 	v1.GET("/events", api.listEvents)
 	v1.GET("/events/:id", api.optionalAuth(), api.getEvent)
+	v1.GET("/events/:id/changes", api.optionalAuth(), api.listEventChanges)
 	v1.GET("/events/:id/participants", api.optionalAuth(), api.listEventParticipants)
 	protected := v1.Group("")
 	protected.Use(api.requireAuth())
@@ -705,6 +706,14 @@ func (a *API) uploadEventCoverBase64(c *gin.Context) {
 		writeError(c, domain.Forbidden("仅活动组织者可以上传封面"))
 		return
 	}
+	if c.Query("stage") == "1" && event.Status != domain.EventDraft && event.ChangeCount >= domain.EventChangeLimit {
+		writeError(c, domain.Conflict("EVENT_CHANGE_LIMIT_REACHED", "活动信息最多只能修改 3 次"))
+		return
+	}
+	if c.Query("stage") != "1" && event.Status != domain.EventDraft {
+		writeError(c, domain.NewError("COVER_STAGE_REQUIRED", "已发布活动请先暂存封面，再随活动信息一起保存", 409))
+		return
+	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, coverBase64BodyLimit)
 	var input struct {
 		Data string `json:"data"`
@@ -736,6 +745,12 @@ func (a *API) uploadEventCoverBase64(c *gin.Context) {
 		return
 	}
 	name := "event-" + event.ID + "." + extension
+	if c.Query("stage") == "1" {
+		name = fmt.Sprintf("event-%s-staged.%s", event.ID, extension)
+		for _, other := range []string{"jpg", "png", "webp"} {
+			_ = os.Remove(filepath.Join(a.avatarDir, "event-"+event.ID+"-staged."+other))
+		}
+	}
 	finalPath := filepath.Join(a.avatarDir, name)
 	temporary, err := os.CreateTemp(a.avatarDir, name+".*.tmp")
 	if err != nil {
@@ -774,6 +789,15 @@ func (a *API) uploadEventCoverBase64(c *gin.Context) {
 		protocol = "https"
 	}
 	coverURL := fmt.Sprintf("%s://%s/api/v1/event-covers/%s?v=%d", protocol, host, name, a.now().UnixMilli())
+	if c.Query("stage") == "1" {
+		c.JSON(http.StatusCreated, data(gin.H{"coverUrl": coverURL}))
+		return
+	}
+	for _, other := range []string{"jpg", "png", "webp"} {
+		if other != extension {
+			_ = os.Remove(filepath.Join(a.avatarDir, "event-"+event.ID+"."+other))
+		}
+	}
 	coverURLValue := coverURL
 	coverURLPtr := &coverURLValue
 	updated, err := a.catalog.UpdateEvent(c.Request.Context(), event.ID, userID(c), service.EventPatch{CoverURL: &coverURLPtr})
@@ -781,11 +805,6 @@ func (a *API) uploadEventCoverBase64(c *gin.Context) {
 		_ = os.Remove(finalPath)
 		writeError(c, err)
 		return
-	}
-	for _, other := range []string{"jpg", "png", "webp"} {
-		if other != extension {
-			_ = os.Remove(filepath.Join(a.avatarDir, "event-"+event.ID+"."+other))
-		}
 	}
 	c.JSON(http.StatusCreated, data(eventResponse(updated)))
 }
@@ -865,6 +884,27 @@ func (a *API) getEvent(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, data(eventDetailResponse(*event, organizer, userID(c) != "" && event.OrganizerID == userID(c))))
+}
+
+func (a *API) listEventChanges(c *gin.Context) {
+	if !validID(c.Param("id")) {
+		writeValidation(c)
+		return
+	}
+	if _, err := a.catalog.GetPublicEvent(c.Request.Context(), c.Param("id"), userID(c)); err != nil {
+		writeError(c, err)
+		return
+	}
+	changes, err := a.repository.ListEventChanges(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	items := make([]any, len(changes))
+	for index, change := range changes {
+		items[index] = eventChangeResponse(change)
+	}
+	c.JSON(http.StatusOK, data(gin.H{"items": items}))
 }
 
 func (a *API) listEventParticipants(c *gin.Context) {
@@ -1027,12 +1067,40 @@ func (a *API) updateEvent(c *gin.Context) {
 		writeValidation(c)
 		return
 	}
+	if patch.CoverURL != nil && *patch.CoverURL != nil && !a.validStagedCover(c, c.Param("id"), *patch.CoverURL) {
+		writeError(c, domain.NewError("COVER_STAGE_INVALID", "活动封面暂存信息无效，请重新选择图片", 422))
+		return
+	}
 	event, err := a.catalog.UpdateEvent(c.Request.Context(), c.Param("id"), userID(c), patch)
 	if err != nil {
 		writeError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, data(eventResponse(event)))
+}
+
+func (a *API) validStagedCover(c *gin.Context, eventID string, coverURL *string) bool {
+	if coverURL == nil {
+		return true
+	}
+	parsed, err := url.Parse(*coverURL)
+	expectedHost := firstForwarded(c.GetHeader("X-Forwarded-Host"))
+	if expectedHost == "" {
+		expectedHost = firstForwarded(c.Request.Host)
+	}
+	expectedScheme := firstForwarded(c.GetHeader("X-Forwarded-Proto"))
+	if expectedScheme == "" {
+		expectedScheme = "https"
+	}
+	if err != nil || parsed.Scheme != expectedScheme || expectedHost != parsed.Host {
+		return false
+	}
+	name := filepath.Base(parsed.Path)
+	if !regexp.MustCompile(`(?i)^event-` + regexp.QuoteMeta(eventID) + `-staged\.(jpg|png|webp)$`).MatchString(name) {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(a.avatarDir, name))
+	return err == nil && info.Mode().IsRegular() && info.Size() > 0 && info.Size() <= coverLimit
 }
 
 func (a *API) listOwnedEvents(c *gin.Context) {

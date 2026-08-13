@@ -133,7 +133,11 @@ exports.mockApi = {
         if (!event)
             throw new Error('娲诲姩涓嶅瓨鍦');
         const route = mock_data_1.routes.find((item) => item.id === input.routeId) || mock_data_1.routes[1];
-        Object.assign(event, { title: input.title, startAt: `${input.date}T${input.time}:00+08:00`, meetingPoint: input.meetingPoint, routeId: route.id, route, capacity: input.capacity, speedRange: input.speedRange, description: input.description, requirements: input.requirements });
+        const changeCount = event.changeCount || 0;
+        const changeLimit = event.changeLimit || 3;
+        if (changeCount >= changeLimit)
+            throw new Error('该活动的修改次数已用完');
+        Object.assign(event, { title: input.title, startAt: `${input.date}T${input.time}:00+08:00`, meetingPoint: input.meetingPoint, routeId: route.id, route, capacity: input.capacity, speedRange: input.speedRange, description: input.description, requirements: input.requirements, changeCount: changeCount + 1, changeLimit, latestChange: { summary: input.changeSummary.trim(), changeNumber: changeCount + 1, createdAt: new Date().toISOString() } });
         saveEvents(allEvents);
         return delay(event);
     },

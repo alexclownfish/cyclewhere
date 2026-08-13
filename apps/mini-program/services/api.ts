@@ -1,8 +1,8 @@
 import { API_BASE_URL, USE_MOCK, WAIVER_VERSION } from '../config/env';
-import type { ApiEnvelope, EventParticipant, EventParticipantContact, MyRegistrationRecord, PublishEventInput, Registration, RegistrationInput, RideEvent, RideRoute, UserProfile } from '../types/domain';
+import type { ApiEnvelope, EventParticipant, EventParticipantContact, MyRegistrationRecord, PublishEventInput, Registration, RegistrationInput, RideEvent, RideRoute, UpdateEventInput, UserProfile } from '../types/domain';
 import { mockApi } from './mock-api';
 import {
-  mapEvent, mapRegistration, mapRoadbook, toCreateEvent,
+  mapEvent, mapRegistration, mapRoadbook, toCreateEvent, toUpdateEvent,
   type BackendEvent, type BackendEventParticipant, type BackendPage, type BackendRegistrationResult, type BackendRoadbook, type BackendUserRegistration,
 } from './api-contract';
 
@@ -43,7 +43,7 @@ export interface ClientApi {
   cancelRegistration(eventId: string): Promise<void>;
   cancelEvent(eventId: string): Promise<void>;
   publish(input: PublishEventInput): Promise<RideEvent>;
-  updateEvent(id: string, input: PublishEventInput): Promise<RideEvent>;
+  updateEvent(id: string, input: UpdateEventInput): Promise<RideEvent>;
   getProfile(): Promise<UserProfile | null>;
   updateProfile(profile: Omit<UserProfile, 'id'>): Promise<UserProfile>;
   importGpx(filePath: string, fileName?: string): Promise<RideRoute>;
@@ -284,11 +284,17 @@ export function createRealApi(transport: Transport, currentUser: UserProvider, a
       return mapEvent(published, route, currentUserId());
     },
     async updateEvent(id, input) {
-      const route = input.routeId
-        ? mapRoadbook(await transport<BackendRoadbook>({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' }))
-        : undefined;
-      let updated = await protectedRequest<BackendEvent>({ url: `/api/v1/events/${id}`, method: 'PUT', data: toCreateEvent(input, route) });
-      if (input.coverFilePath) updated = await uploadEventCover(id, input.coverFilePath, await authHeaders());
+      const [current, route] = await Promise.all([
+        transport<BackendEvent>({ url: `/api/v1/events/${id}`, method: 'GET' }),
+        input.routeId
+          ? transport<BackendRoadbook>({ url: `/api/v1/routes/${input.routeId}`, method: 'GET' }).then(mapRoadbook)
+          : Promise.resolve(undefined),
+      ]);
+      const stagedCover = input.coverFilePath
+        ? await uploadEventCover(id, input.coverFilePath, await authHeaders(), true)
+        : null;
+      const updateInput = stagedCover ? { ...input, coverUrl: stagedCover.coverUrl } : input;
+      const updated = await protectedRequest<BackendEvent>({ url: `/api/v1/events/${id}`, method: 'PUT', data: toUpdateEvent(updateInput, route, current) });
       return mapEvent(updated, route, currentUserId());
     },
     async getProfile() {
@@ -375,13 +381,13 @@ function uploadAvatarBase64(filePath: string, headers: Record<string, string>): 
   })));
 }
 
-function uploadEventCover(eventId: string, filePath: string, headers: Record<string, string>): Promise<BackendEvent> {
-  return readFileAsBase64(filePath).then((data) => new Promise((resolve, reject) => wx.request<ApiEnvelope<BackendEvent>>({
-    url: `${API_BASE_URL}/api/v1/events/${eventId}/cover/base64`, method: 'POST', data: { data },
+function uploadEventCover(eventId: string, filePath: string, headers: Record<string, string>, stageOnly = false): Promise<BackendEvent & { coverUrl: string }> {
+  return readFileAsBase64(filePath).then((data) => new Promise((resolve, reject) => wx.request<ApiEnvelope<BackendEvent & { coverUrl: string }>>({
+    url: `${API_BASE_URL}/api/v1/events/${eventId}/cover/base64${stageOnly ? '?stage=1' : ''}`, method: 'POST', data: { data },
     header: { 'content-type': 'application/json', ...headers },
     success(response) {
       try {
-        const body = typeof response.data === 'string' ? JSON.parse(response.data) as ApiEnvelope<BackendEvent> : response.data;
+        const body = typeof response.data === 'string' ? JSON.parse(response.data) as ApiEnvelope<BackendEvent & { coverUrl: string }> : response.data;
         if (response.statusCode >= 200 && response.statusCode < 300 && body.data) resolve(body.data);
         else {
           const payload = body as unknown as { error?: { code?: string; message?: string } };

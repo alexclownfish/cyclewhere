@@ -177,7 +177,6 @@ Page({
   editEvent(event: WechatMiniprogram.TouchEvent) {
     const id = String(event.currentTarget.dataset.id || '');
     if (!id) return wx.showToast({ title: '活动信息暂不可用', icon: 'none' });
-    wx.setStorageSync('pending_edit_event_id', id);
-    wx.switchTab({ url: '/pages/publish/index' });
+    wx.navigateTo({ url: `/pages/event-edit/index?id=${encodeURIComponent(id)}` });
   },
 });

@@ -11,12 +11,38 @@ interface ParticipantView extends EventParticipant {
   contactLoading?: boolean;
 }
 
+interface ChangeNoticeView {
+  summary: string;
+  timeText: string;
+  changeNumber: number;
+  changedFields: Array<{ field: string; before: string; after: string }>;
+}
+
 function presentParticipants(items: EventParticipant[]): ParticipantView[] {
   return items.map((item, key) => {
     const displayName = item.nickname?.trim() || '微信骑友';
     return { ...item, key, displayName, avatarText: displayName.slice(0, 1) || '骑' };
   });
 }
+
+function readableChangeValue(field: string, value: string, event: RideEvent): string {
+  if (field === 'route') return value || '活动路书已调整';
+  if (field === 'routeId') return value ? event.route.name || '活动路书已更新' : '不使用路书';
+  if (field === 'cover') return value || '活动封面已更新';
+  if (field === 'coverUrl') return value ? '已更新封面' : '未设置封面';
+  if (field === 'startAt' || field === 'registrationDeadline') return value ? formatRideDate(value) : '未设置';
+  if (field === 'difficulty') return ({ easy: '轻松', moderate: '中等', challenging: '进阶', expert: '专家' } as Record<string, string>)[value] || value;
+  if (field === 'equipmentRequirements' || field === 'abilityRequirements') {
+    try { const items = JSON.parse(value) as string[]; return items.join('、') || '无'; } catch { return value; }
+  }
+  return value || '无';
+}
+
+const PUBLIC_CHANGE_FIELDS: Record<string, string> = {
+  route: '活动路书', routeId: '活动路书', title: '活动名称', summary: '活动说明', cover: '活动封面', coverUrl: '活动封面', startAt: '出发时间', registrationDeadline: '报名截止',
+  meetingPoint: '集合地点', difficulty: '活动难度', distanceKm: '活动距离', elevationGainM: '累计爬升', speedMinKph: '最低巡航速度', speedMaxKph: '最高巡航速度',
+  capacity: '人数上限', equipmentRequirements: '必备装备', abilityRequirements: '能力要求', safetyNotice: '风险说明',
+};
 
 Page({
   data: {
@@ -25,6 +51,7 @@ Page({
     canRegisterNow: false, actionText: '报名参加', cancelling: false, eventCancelling: false,
     participants: [] as ParticipantView[], participantsLoading: false, participantsError: '',
     participantLoadGeneration: 0,
+    changeNotice: null as ChangeNoticeView | null, changeExpanded: false,
     appleModal: { visible: false, title: '', content: '', showCancel: true, cancelText: '取消', confirmText: '好', destructive: false } as AppleModalState,
   },
   onLoad(options: Record<string, string>) { this.setData({ id: options.id || 'event-miaofeng' }); },
@@ -56,8 +83,25 @@ Page({
         statusText: event.status === 'cancelled' ? '活动已取消' : event.status === 'full' ? '名额已满' : event.status === 'completed' ? '已结束' : deadlineClosed ? '报名已截止' : '报名中',
         canRegisterNow, actionText, participants: participantState.items,
         participantsLoading: false, participantsError: participantState.error,
+        changeNotice: event.latestChange ? {
+          summary: event.latestChange.summary,
+          timeText: event.latestChange.createdAt ? formatRideDate(event.latestChange.createdAt) : '',
+          changeNumber: event.latestChange.changeNumber || event.changeCount || 0,
+          changedFields: (event.latestChange.changedFields || [])
+            .filter((item) => Boolean(PUBLIC_CHANGE_FIELDS[item.field]) && item.before !== item.after)
+            .map((item) => ({
+              field: PUBLIC_CHANGE_FIELDS[item.field],
+              before: readableChangeValue(item.field, item.before, event),
+              after: readableChangeValue(item.field, item.after, event),
+            })),
+        } : null,
+        changeExpanded: false,
       });
     } catch (error) { this.setData({ loading: false, participantsLoading: false, error: errorMessage(error) }); }
+  },
+  toggleChangeNotice() {
+    if (!this.data.changeNotice?.changedFields.length) return;
+    this.setData({ changeExpanded: !this.data.changeExpanded });
   },
   async loadParticipants() {
     const participantLoadGeneration = this.data.participantLoadGeneration + 1;

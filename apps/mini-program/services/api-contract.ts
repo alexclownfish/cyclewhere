@@ -1,4 +1,4 @@
-import type { PublishEventInput, Registration, RideEvent, RideRoute } from '../types/domain';
+import type { PublishEventInput, Registration, RideEvent, RideRoute, UpdateEventInput } from '../types/domain';
 import { gcj02ToWgs84, wgs84ToGcj02 } from '../utils/coordinates';
 
 export type BackendDifficulty = 'easy' | 'moderate' | 'challenging' | 'expert';
@@ -13,6 +13,8 @@ export interface BackendEvent {
   createdAt: string; updatedAt: string; version: number;
   organizerProfile?: { nickname: string | null; avatarUrl: string | null } | null;
   ownedByMe?: boolean;
+  changeCount?: number; changeLimit?: number;
+  latestChange?: { summary: string; changeNumber?: number; createdAt: string; changedFields?: Array<{ field: string; before: string; after: string }> } | null;
 }
 export interface BackendWaypoint {
   name: string; type: 'start' | 'finish' | 'water' | 'supply' | 'danger' | 'viewpoint';
@@ -43,6 +45,8 @@ export interface CreateBackendEvent {
   speedMinKph: number; speedMaxKph: number; capacity: number; equipmentRequirements: string[];
   abilityRequirements: string[]; safetyNotice: string;
 }
+
+export interface UpdateBackendEvent extends CreateBackendEvent { changeSummary: string; }
 
 const difficultyToClient: Record<BackendDifficulty, RideRoute['difficulty']> = {
   easy: '轻松', moderate: '中等', challenging: '进阶', expert: '进阶',
@@ -121,6 +125,9 @@ export function mapEvent(event: BackendEvent, route: RideRoute | undefined, curr
       disciplines: parsedRequirements.disciplines, customNote: parsedRequirements.customNote,
     },
     ownedByMe: event.ownedByMe ?? (Boolean(currentUserId) && event.organizerId === currentUserId),
+    changeCount: event.changeCount ?? 0,
+    changeLimit: event.changeLimit ?? 3,
+    latestChange: event.latestChange || null,
   };
 }
 
@@ -152,5 +159,17 @@ export function toCreateEvent(input: PublishEventInput, route?: RideRoute): Crea
     elevationGainM: route?.elevationGainM ?? input.elevationGainM ?? 0,
     speedMinKph: speeds[0] || 20, speedMaxKph: speeds[1] || speeds[0] || 25, capacity: input.capacity,
     equipmentRequirements: input.requirements.equipment, abilityRequirements, safetyNotice: input.description.trim(),
+  };
+}
+
+export function toUpdateEvent(input: UpdateEventInput, route: RideRoute | undefined, current: BackendEvent): UpdateBackendEvent & { coverUrl?: string | null } {
+  const payload = toCreateEvent(input, route);
+  const startChanged = payload.startAt !== current.startAt;
+  return {
+    ...payload,
+    registrationDeadline: startChanged ? payload.registrationDeadline : current.registrationDeadline,
+    safetyNotice: current.safetyNotice,
+    changeSummary: input.changeSummary.trim(),
+    ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl } : {}),
   };
 }

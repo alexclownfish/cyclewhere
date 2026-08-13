@@ -8,13 +8,12 @@ interface SelectOption { label: string; selected: boolean; }
 interface RouteOption { name: string; route: RideRoute | null; }
 interface LocationSuggestion { label: string; note: string; latitude?: number; longitude?: number; }
 
-const PENDING_EDIT_KEY = 'pending_edit_event_id';
 const RECENT_MEETING_POINTS_KEY = 'fengji_recent_meeting_points_v1';
 let keyboardCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
 Page({
   data: {
-    routes: [] as RideRoute[], routeOptions: [{ name: '不选择路书', route: null }] as RouteOption[], selectedRoute: null as RideRoute | null, routeIndex: 0, submitting: false, editingId: '', importingGpx: false, keyboardOpen: false,
+    routes: [] as RideRoute[], routeOptions: [{ name: '不选择路书', route: null }] as RouteOption[], selectedRoute: null as RideRoute | null, routeIndex: 0, submitting: false, importingGpx: false, keyboardOpen: false,
     locationSuggestions: [] as LocationSuggestion[], showLocationSuggestions: false,
     difficultyOptions: ['轻松', '中等', '进阶'] as RideRoute['difficulty'][], difficultyIndex: 1,
     coverPreview: '',
@@ -40,33 +39,13 @@ Page({
       { label: '下坡禁止超车', selected: true }, { label: '掉队原地等收队', selected: true },
     ] as SelectOption[],
   },
-  async onLoad(options: Record<string, string>) {
+  async onLoad() {
     this.syncRequirements();
     await Promise.all([this.loadRoutes(), this.checkLogin()]);
-    if (options.id) { this.setData({ editingId: options.id }); await this.loadEditingEvent(options.id); }
-  },
-  async onShow() {
-    const pendingId = String(wx.getStorageSync(PENDING_EDIT_KEY) || '');
-    if (!pendingId || this.data.editingId === pendingId) return;
-    wx.removeStorageSync(PENDING_EDIT_KEY);
-    this.setData({ editingId: pendingId, routesError: '' });
-    if (!this.data.routes.length) await this.loadRoutes();
-    await this.loadEditingEvent(pendingId);
   },
   onUnload() {
     if (keyboardCloseTimer) clearTimeout(keyboardCloseTimer);
     keyboardCloseTimer = null;
-  },
-  async loadEditingEvent(id: string) {
-    try {
-      const event = await api.getEvent(id);
-      const start = new Date(event.startAt);
-      const foundIndex = this.data.routes.findIndex((item) => item.id === event.routeId);
-      const selectedRoute = foundIndex >= 0 ? this.data.routes[foundIndex] : null;
-      const difficultyIndex = Math.max(0, this.data.difficultyOptions.indexOf(event.route.difficulty));
-      this.setData({ routeIndex: foundIndex >= 0 ? foundIndex + 1 : 0, selectedRoute, difficultyIndex, coverPreview: event.coverUrl || '', 'form.title': event.title, 'form.date': `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`, 'form.time': `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`, 'form.meetingPoint': event.meetingPoint, 'form.meetingLatitude': event.meetingLatitude ?? undefined, 'form.meetingLongitude': event.meetingLongitude ?? undefined, 'form.capacity': event.capacity, 'form.speedRange': event.speedRange, 'form.description': event.description, 'form.routeId': event.routeId, 'form.distanceKm': event.route.distanceKm, 'form.elevationGainM': event.route.elevationGainM, 'form.difficulty': event.route.difficulty, 'form.requirements': event.requirements });
-      this.setData({ equipmentOptions: this.data.equipmentOptions.map((item) => ({ ...item, selected: event.requirements.equipment.includes(item.label) })), bikeOptions: this.data.bikeOptions.map((item) => ({ ...item, selected: event.requirements.bikeTypes.includes(item.label) })), disciplineOptions: this.data.disciplineOptions.map((item) => ({ ...item, selected: event.requirements.disciplines.includes(item.label) })) });
-    } catch (error) { this.setData({ routesError: errorMessage(error) }); }
   },
   async checkLogin() {
     if (!wx.getStorageSync('auth_token')) {
@@ -158,7 +137,7 @@ Page({
     const now = new Date();
     const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     this.setData({
-      editingId: '', selectedRoute: null, routeIndex: 0, coverPreview: '', locationSuggestions: [], showLocationSuggestions: false, keyboardOpen: false,
+      selectedRoute: null, routeIndex: 0, coverPreview: '', locationSuggestions: [], showLocationSuggestions: false, keyboardOpen: false,
       form: {
         title: '', date, time: '06:30', meetingPoint: '', meetingLatitude: undefined, meetingLongitude: undefined, routeId: '', distanceKm: 0, elevationGainM: 0,
         difficulty: '中等', capacity: 16, speedRange: '23-26 km/h', description: '',
@@ -224,19 +203,17 @@ Page({
     if (!validation.valid) return wx.showToast({ title: validation.message, icon: 'none' });
     this.setData({ submitting: true });
     try {
-      const editing = Boolean(this.data.editingId);
-      if (editing) await api.updateEvent(this.data.editingId, this.data.form);
-      else await api.publish(this.data.form);
+      await api.publish(this.data.form);
       await openAppleModal(this, {
-        title: editing ? '活动已更新' : '活动已发布',
-        content: editing ? '修改内容已保存。' : '活动已进入公开列表，可在“我的活动”中继续管理。',
+        title: '活动已发布',
+        content: '活动已进入公开列表，可在“我的活动”中继续管理。',
         showCancel: false,
         confirmText: '查看活动',
       });
       this.resetForNewEvent();
       wx.switchTab({ url: '/pages/mine/index' });
     } catch (error) {
-      await openAppleModal(this, { title: this.data.editingId ? '保存失败' : '发布失败', content: errorMessage(error), showCancel: false, confirmText: '知道了' });
+      await openAppleModal(this, { title: '发布失败', content: errorMessage(error), showCancel: false, confirmText: '知道了' });
     }
     finally { this.setData({ submitting: false }); }
   },

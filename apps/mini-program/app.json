@@ -4,6 +4,7 @@
     "pages/gateway/index",
     "pages/events/index",
     "pages/event-detail/index",
+    "pages/event-edit/index",
     "pages/route-detail/index",
     "pages/register/index",
     "pages/publish/index",

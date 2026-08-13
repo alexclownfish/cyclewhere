@@ -1,16 +1,14 @@
 <view class="page publish-page">
   <view class="publish-head">
-    <view class="head-topline"><view class="head-kicker">{{editingId ? '管理活动' : '发起骑行'}}</view><view class="head-step">信息确认</view></view>
-    <view class="head-title">{{editingId ? '编辑活动信息' : '创建一场骑行'}}</view>
-    <view class="head-copy">{{editingId ? '调整活动说明与同行要求，保存后立即生效。' : '把路线、节奏与同行规则说清楚，让每一次出发更安心。'}}</view>
+    <view class="head-topline"><view class="head-kicker">发起骑行</view><view class="head-step">信息确认</view></view>
+    <view class="head-title">创建一场骑行</view>
+    <view class="head-copy">把路线、节奏与同行规则说清楚，让每一次出发更安心。</view>
     <view class="steps"><view class="step step-on"></view><view class="step step-on"></view><view class="step step-on"></view><view class="step step-on"></view></view>
   </view>
 
   <view wx:if="{{authChecking}}" class="state-banner"><view class="state-dot"></view><view class="state-copy">正在确认登录状态…</view></view>
   <view wx:elif="{{authError}}" class="state-banner state-error"><view class="state-icon">!</view><view class="state-content"><view class="state-title">需要微信登录</view><view class="state-copy">{{authError}}</view></view><button class="state-action" bindtap="authorizeLogin">授权登录</button></view>
   <view wx:if="{{routesError}}" class="state-banner state-error"><view class="state-icon">!</view><view class="state-content"><view class="state-title">路书加载失败</view><view class="state-copy">{{routesError}}</view></view><button class="state-action" bindtap="loadRoutes">重试</button></view>
-
-  <view wx:if="{{editingId}}" class="state-banner"><view class="state-dot"></view><view class="state-copy">正在编辑已发布活动，仅组织者可保存</view></view>
 
   <view class="gpx-import">
     <view class="gpx-copy"><view class="form-title">导入自己的路书</view><view class="section-copy">支持 GPX 文件；iGPSPORT 路书请先导出 GPX 后选择文件</view></view>
@@ -50,7 +48,7 @@
     <view class="notice"><view class="notice-mark">✓</view><view>已选择 {{form.requirements.equipment.length}} 项装备、{{form.requirements.bikeTypes.length}} 种车型和 {{form.requirements.disciplines.length}} 条纪律。发布后会同步展示在详情与报名确认页。</view></view>
   </view>
 
-  <view wx:if="{{!keyboardOpen}}" class="sticky-actions"><button class="button button-primary" loading="{{submitting}}" disabled="{{submitting || !authReady}}" bindtap="submit">{{authReady ? (editingId ? '保存修改' : '确认发布') : '登录后继续'}}</button></view>
+  <view wx:if="{{!keyboardOpen}}" class="sticky-actions"><button class="button button-primary" loading="{{submitting}}" disabled="{{submitting || !authReady}}" bindtap="submit">{{authReady ? '确认发布' : '登录后继续'}}</button></view>
 
   <view wx:if="{{appleModal.visible}}" class="apple-modal-backdrop" catchtouchmove="noop" catchtap="noop">
     <view class="apple-modal" catchtap="noop">

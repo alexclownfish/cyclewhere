@@ -56,6 +56,22 @@ export interface RideEvent {
   description: string;
   requirements: RideRequirements;
   ownedByMe?: boolean;
+  changeCount?: number;
+  changeLimit?: number;
+  latestChange?: EventChangeNotice | null;
+}
+
+export interface EventChangeItem {
+  field: string;
+  before: string;
+  after: string;
+}
+
+export interface EventChangeNotice {
+  summary: string;
+  changeNumber?: number;
+  createdAt: string;
+  changedFields?: EventChangeItem[];
 }
 
 export interface Registration {
@@ -97,6 +113,11 @@ export interface PublishEventInput {
   coverFilePath?: string;
   coverUrl?: string | null;
   requirements: RideRequirements;
+}
+
+export interface UpdateEventInput extends PublishEventInput {
+  changeSummary: string;
+  coverUrl?: string | null;
 }
 
 export interface UserProfile {
